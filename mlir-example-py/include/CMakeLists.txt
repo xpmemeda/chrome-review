@@ -1,0 +1,6 @@
+set(LLVM_TARGET_DEFINITIONS ops.td)
+mlir_tablegen(ops.h.inc -gen-op-decls)
+mlir_tablegen(ops.cpp.inc -gen-op-defs)
+mlir_tablegen(dialect.h.inc -gen-dialect-decls)
+mlir_tablegen(dialect.cpp.inc -gen-dialect-defs)
+add_custom_target(tfcc_dialect DEPENDS ops.h.inc ops.cpp.inc dialect.h.inc dialect.cpp.inc)

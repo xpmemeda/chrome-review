@@ -110,7 +110,7 @@ int runJit(mlir::ModuleOp module) {
   return 0;
 }
 
-int main(int argc, char **argv) {
+int func_main() {
     mlir::MLIRContext context;
     context.getOrLoadDialect<mlir::tfcc::TfccDialect>();
     mlir::OwningModuleRef module = mlirGen(context);

@@ -31,25 +31,24 @@ def ReturnOp : Tfcc_Op<"return", [NoSideEffect, HasParent<"FuncOp">, Terminator]
     let arguments = (ins);
 }
 
-class ElemwiseOp<string mnemonic> : Tfcc_Op<mnemonic> {
+def AddOp : Tfcc_Op<"add"> {
+    let summary = "element-wise addition operation";
+    let description = [{+}];
     let arguments = (ins F64:$lhs, F64:$rhs);
     let results = (outs F64);
     let builders = [
-        OpBuilder<(ins "Value":$lhs, "Value":$rhs), [{
-            $_state.addTypes(lhs.getType());
-            $_state.addOperands({lhs, rhs});
-        }]>
+        OpBuilder<(ins "Value":$lhs, "Value":$rhs)>
     ];
 }
 
-def AddOp : ElemwiseOp<"add">;
-
-def MulOp : ElemwiseOp<"mul"> {
+def MulOp : Tfcc_Op<"mul"> {
     let summary = "element-wise multiplication operation";
-    let description = "*";
-    let assemblyFormat = [{
-        `(` $lhs `:` type($lhs) `,` $rhs `:` type($rhs) `)` attr-dict `to` type(results)
-    }];
+    let description = [{*}];
+    let arguments = (ins F64:$lhs, F64:$rhs);
+    let results = (outs F64);
+    let builders = [
+        OpBuilder<(ins "Value":$lhs, "Value":$rhs)>
+    ];
 }
 
 def PrintOp : Tfcc_Op<"print"> {
@@ -63,5 +62,5 @@ def PrintOp : Tfcc_Op<"print"> {
   // We also allow a F64MemRef to enable interop during partial lowering.
   let arguments = (ins F64:$input);
 
-  let assemblyFormat = "$input attr-dict `:` type($input)";
+//   let assemblyFormat = "$input attr-dict `:` type($input)";
 }
