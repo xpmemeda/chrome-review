@@ -38,7 +38,12 @@ add_definitions(${LLVM_DEFINITIONS})
 
 add_subdirectory(include)
 
+# compared to add_executable, add_llvm_executable have some default options.
 add_llvm_executable(mlir_example main.cpp dialect.cpp lower2llvm.cpp)
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
+# add_executable(mlir_example main.cpp dialect.cpp lower2llvm.cpp)
+
+
 add_dependencies(mlir_example tfcc_dialect)
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
@@ -48,3 +53,21 @@ message(STATUS "conversion_libs: ${conversion_libs}")
 set(LIBS ${dialect_libs} ${conversion_libs})
 target_link_libraries(mlir_example PRIVATE ${LIBS})
 
+target_link_libraries(mlir_example
+  PRIVATE
+    MLIRAnalysis
+    MLIRCallInterfaces
+    MLIRCastInterfaces
+    MLIRExecutionEngine
+    MLIRIR
+    MLIRLLVMCommonConversion
+    MLIRLLVMIR
+    MLIRLLVMToLLVMIRTranslation
+    MLIRMemRef
+    MLIRParser
+    MLIRPass
+    MLIRSideEffectInterfaces
+    MLIRSupport
+    MLIRTargetLLVMIRExport
+    MLIRTransforms
+    )

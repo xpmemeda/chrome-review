@@ -16,20 +16,20 @@ void TfccDialect::initialize() {
 
 void ConstantOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
                        double value) {
-  auto dataType = RankedTensorType::get({}, builder.getF64Type());
-  auto dataAttribute = DenseElementsAttr::get(dataType, value);
+  auto dataType = builder.getF64Type();
+  auto dataAttribute = FloatAttr::get(dataType, value);
   ConstantOp::build(builder, state, dataType, dataAttribute);
 }
 
 void AddOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
                   mlir::Value lhs, mlir::Value rhs) {
-  state.addTypes(UnrankedTensorType::get(builder.getF64Type()));
+  state.addTypes(builder.getF64Type());
   state.addOperands({lhs, rhs});
 }
 
 void MulOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
                   mlir::Value lhs, mlir::Value rhs) {
-  state.addTypes(UnrankedTensorType::get(builder.getF64Type()));
+  state.addTypes(builder.getF64Type());
   state.addOperands({lhs, rhs});
 }
 
