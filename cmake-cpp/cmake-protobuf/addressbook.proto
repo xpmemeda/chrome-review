@@ -1,0 +1,38 @@
+syntax = "proto2";
+
+package tutorial;
+
+enum PbEnum {
+  PbEnum_X = 1;
+  PbEnum_Y = 2;
+}
+
+message Person {
+  optional string name = 1;
+  optional int32 id = 2;
+  optional string email = 3;
+
+  enum PhoneType {
+    MOBILE = 0;
+    HOME = 1;
+    WORK = 2;
+  }
+
+  message PhoneNumber {
+    optional string number = 1;
+    optional PhoneType type = 2 [default = HOME];
+  }
+
+  repeated PhoneNumber phones = 4;
+}
+
+message AddressBook {
+  repeated Person people = 1;
+  message Dimension {
+    oneof DimensionValue {
+      uint32 value = 1;
+      string param = 2;
+    }
+  }
+  optional Dimension dimension = 2;
+}
