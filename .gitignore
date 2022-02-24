@@ -1,1 +1,5 @@
+# build directory
 build
+
+# pybind11 symbol link used to build python-c++ interface
+pybind11
