@@ -62,5 +62,5 @@ def PrintOp : Tfcc_Op<"print"> {
   // We also allow a F64MemRef to enable interop during partial lowering.
   let arguments = (ins F64:$input);
 
-//   let assemblyFormat = "$input attr-dict `:` type($input)";
+  let assemblyFormat = "$input attr-dict `:` type($input)";
 }
