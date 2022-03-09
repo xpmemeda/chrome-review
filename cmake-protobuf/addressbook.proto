@@ -2,6 +2,11 @@ syntax = "proto2";
 
 package tutorial;
 
+enum PbEnum {
+  PbEnum_X = 1;
+  PbEnum_Y = 2;
+}
+
 message Person {
   optional string name = 1;
   optional int32 id = 2;
