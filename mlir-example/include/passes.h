@@ -5,8 +5,12 @@
 namespace mlir {
 class Pass;
 
-namespace tfcc {
+namespace demo {
+
+std::unique_ptr<Pass> createLowerToVectorPass();
+std::unique_ptr<Pass> createLowerToLinalgPass();
 std::unique_ptr<Pass> createLowerToLlvmPass();
+
 }
 
 }

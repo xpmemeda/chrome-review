@@ -39,12 +39,11 @@ add_definitions(${LLVM_DEFINITIONS})
 add_subdirectory(include)
 
 # compared to add_executable, add_llvm_executable have some default options.
-add_llvm_executable(mlir_example main.cpp dialect.cpp lower2llvm.cpp)
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
-# add_executable(mlir_example main.cpp dialect.cpp lower2llvm.cpp)
+include_directories($ENV{GTEST_HOME}/include/)
+link_directories($ENV{GTEST_HOME}/lib64/)
+add_llvm_executable(mlir_example gtest_main.cpp dialect.cpp lower2llvm.cpp)
 
-
-add_dependencies(mlir_example tfcc_dialect)
+add_dependencies(mlir_example demo_dialect)
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 message(STATUS "dialect_libs: ${dialect_libs}")
@@ -71,3 +70,6 @@ target_link_libraries(mlir_example
     MLIRTargetLLVMIRExport
     MLIRTransforms
     )
+
+target_link_libraries(mlir_example PRIVATE pthread)
+target_link_libraries(mlir_example PRIVATE gtest)

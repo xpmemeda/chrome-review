@@ -6,22 +6,15 @@
 #include "mlir/Transforms/InliningUtils.h"
 
 using namespace mlir;
-using namespace mlir::tfcc;
+using namespace mlir::demo;
 
 #include "dialect.cpp.inc"
 
-void TfccDialect::initialize() {
+void DemoDialect::initialize() {
     addOperations<
 #define GET_OP_LIST
 #include "ops.cpp.inc"
     >();
-}
-
-void ConstantOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
-                       double value) {
-  auto dataType = builder.getF64Type();
-  auto dataAttribute = FloatAttr::get(dataType, value);
-  ConstantOp::build(builder, state, dataType, dataAttribute);
 }
 
 #define GET_OP_CLASSES
