@@ -1,5 +1,6 @@
 build
-pybind11
+hello-world
+__pycache__
 *.so
 *.onnx
 *.npz
