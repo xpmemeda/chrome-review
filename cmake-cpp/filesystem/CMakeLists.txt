@@ -5,4 +5,4 @@ project(hello-world)
 file(GLOB SOURCE_FILES *.cpp *.h)
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
-target_link_libraries(${PROJECT_NAME} -lstdc++fs)
+target_link_libraries(${PROJECT_NAME} stdc++fs)
