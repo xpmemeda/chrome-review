@@ -3,15 +3,16 @@ cmake_minimum_required(VERSION 3.10)
 project(hello-world-cmake-install VERSION 1.0 DESCRIPTION "hello-world-cmake-install-example")
 
 file(GLOB_RECURSE SRC_FILES "src/*.cpp")
-file(GLOB_RECURSE HDR_FILES "include/*.h")
+file(GLOB_RECURSE HDR_FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h)
+message(STATUS "${HDR_FILES}")
 
 add_library(${PROJECT_NAME} SHARED ${SRC_FILES})
 # # $<BUILD_INTERFACE:...>: For self build
 # # $<INSTALL_INTERFACE:...>: For library users, automaticly include_directories(...)
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/include>)
 
-set_target_properties(${PROJECT_NAME} PROPERTIES PUBLIC_HEADER ${HDR_FILES})
-set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${PROJECT_VERSION})
+set_target_properties(${PROJECT_NAME} PROPERTIES PUBLIC_HEADER "${HDR_FILES}")
+# set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${PROJECT_VERSION})
 
 # install hdrs, libs and executables to specified dir
 install(
@@ -20,7 +21,13 @@ install(
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
   RUNTIME DESTINATION bin
-  PUBLIC_HEADER DESTINATION include
+  # PUBLIC_HEADER DESTINATION include
+)
+install(
+  DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include"
+  DESTINATION "include"
+  FILES_MATCHING
+    PATTERN "*.h"
 )
 
 # generate ``{PROJECT_NAME}-config.cmake``, which
