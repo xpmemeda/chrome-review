@@ -5,6 +5,7 @@
 #include <sstream>
 #include <string>
 
+std::string exec(const char *cmd);
 int64_t get_time_stamp();
 std::string load_data_from_file(const std::string &path);
 std::string bytes_to_hex(const std::string &bytes);
