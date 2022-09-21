@@ -1,7 +1,9 @@
 build
+build-debug
+build-release
 hello-world
 __pycache__
 *.so
 *.onnx
 *.npz
-*.pb
+*.npy
