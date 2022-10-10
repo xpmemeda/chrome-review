@@ -550,9 +550,12 @@ def conv():
 
 
 def einsum():
-    x = onnx.helper.make_tensor_value_info("x", onnx.TensorProto.FLOAT, [2, 2])
-    y = onnx.helper.make_tensor_value_info("y", onnx.TensorProto.FLOAT, [1, 2, 3])
-    z = onnx.helper.make_tensor_value_info("z", onnx.TensorProto.FLOAT, [2, 3])
+    x_shp = [2, 2]
+    y_shp = [1, 2, 3]
+    z_shp = [2, 3]
+    x = onnx.helper.make_tensor_value_info("x", onnx.TensorProto.FLOAT, x_shp)
+    y = onnx.helper.make_tensor_value_info("y", onnx.TensorProto.FLOAT, y_shp)
+    z = onnx.helper.make_tensor_value_info("z", onnx.TensorProto.FLOAT, z_shp)
 
     eqn = "bn,bni->bi"
     node = onnx.helper.make_node(
@@ -567,13 +570,17 @@ def einsum():
         f.write(model.SerializeToString())
 
     np.random.seed(0)
-    np_x = np.random.random(size=[2, 2]).astype(np.float32)
-    np_y = np.random.random(size=[1, 2, 3]).astype(np.float32)
+    np_x = np.random.random(size=x_shp).astype(np.float32)
+    np_y = np.random.random(size=y_shp).astype(np.float32)
     np.savez("einsum.npz", x=np_x, y=np_y)
     onnxnet = ort.InferenceSession("einsum.onnx", providers=["CPUExecutionProvider"])
     np_z = onnxnet.run(None, {"x": np_x, "y": np_y})
-    return np_z
+    print("sum: ", np.sum(np_z))
+    print("avg: ", np.mean(np_z))
+    print("var: ", np.var(np_z))
+    print("max: ", np.max(np_z))
+    print("min: ", np.min(np_z))
 
 
 if __name__ == "__main__":
-    print(einsum())
+    einsum()
