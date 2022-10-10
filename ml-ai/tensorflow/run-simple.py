@@ -1,5 +1,4 @@
 import tensorflow as tf
-import pdb
 
 
 # eager
@@ -11,7 +10,6 @@ table = tf.lookup.StaticHashTable(init, default_value=-1)
 input_tensor = tf.constant(["a", "f"])
 x = table.lookup(input_tensor).numpy()
 
-pdb.set_trace()
 print(table)
 print(x)
 
