@@ -1,0 +1,2 @@
+libirc.a filter=lfs diff=lfs merge=lfs -text
+libsvml.a filter=lfs diff=lfs merge=lfs -text
