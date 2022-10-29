@@ -3,9 +3,3 @@ build-debug
 build-release
 hello-world
 __pycache__
-*.so
-*.onnx
-*.tfccrt
-*.npz
-*.npy
-*.pb
