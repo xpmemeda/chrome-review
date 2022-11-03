@@ -30,7 +30,56 @@ def _add_op_type(parser):
 
 
 @_register_func(_add_model_path)
-def print_summary(args):
+def print_io_info(args):
+    savedmodelcli_cmd = [
+        "saved_model_cli",
+        "show",
+        "--signature_def",
+        "serving_default",
+        "--tag_set",
+        "serve",
+        "--dir",
+        args.model_path,
+    ]
+    process = subprocess.Popen(
+        savedmodelcli_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+    out, err = process.communicate()
+    errcode = process.returncode
+    if errcode:
+        print(err)
+        return
+
+    import re
+
+    pattern_inp_name = re.compile(r"""inputs\['\S+'\]""")
+    inp_names = pattern_inp_name.findall(str(out))
+    inp_names = [name[8:-2] for name in inp_names]
+    pattern_oup_name = re.compile(r"""outputs\['\S+'\]""")
+    oup_names = pattern_oup_name.findall(str(out))
+    oup_names = [name[9:-2] for name in oup_names]
+
+    pattern_dtype = re.compile(r"""dtype: \S+\\n""")
+    dtypes = pattern_dtype.findall(str(out))
+    dtypes = [dtype[7:-2] for dtype in dtypes]
+
+    pattern_shape = re.compile(r"""shape: \(.+?\)""")
+    shapes = pattern_shape.findall(str(out))
+    shapes = [list(map(int, shape[8:-1].split(", "))) for shape in shapes]
+
+    assert len(inp_names) + len(oup_names) == len(dtypes) == len(shapes)
+    print("[inp]")
+    for name, dtype, shape in zip(inp_names, dtypes, shapes):
+        print("{:<30s} dtype={:<20s}shape={}".format(name, dtype, shape))
+    print("[oup]")
+    for name, dtype, shape in zip(
+        oup_names, dtypes[len(inp_names) :], shapes[len(inp_names) :]
+    ):
+        print("{:<30s} dtype={:<20s}shape={}".format(name, dtype, shape))
+
+
+@_register_func(_add_model_path)
+def count_nodes(args):
     saved_model = SavedModel()
     with open(os.path.join(args.model_path, "saved_model.pb"), "rb") as f:
         saved_model.ParseFromString(f.read())
@@ -43,11 +92,9 @@ def print_summary(args):
             for node in func.node_def:
                 op2nums[node.op] += 1
 
-    print("[operations]\n")
+    print("[operations]")
     for k, v in op2nums.items():
         print("{:<40s} {}".format(k, v))
-
-    subprocess.run(["saved_model_cli", "show", "--all", "--dir", args.model_path])
 
 
 @_register_func(_add_model_path)
