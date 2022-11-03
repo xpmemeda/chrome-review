@@ -1,8 +1,30 @@
 import numpy as np
 import onnx
 import onnxruntime as ort
+import argparse
 
 
+parser = argparse.ArgumentParser(add_help=True)
+subparsers = parser.add_subparsers(help="cmd")
+subparsers.required = True
+
+
+def print_numpy_array(arr):
+    print(arr)
+    print(arr.shape)
+    print(
+        "min: {:.2f}, max: {:.2f}, avg: {:.2f}, var: {:.2f}".format(
+            np.min(arr), np.max(arr), np.mean(arr), np.var(arr)
+        )
+    )
+
+
+def _register_func(impl):
+    subparser = subparsers.add_parser(impl.__name__)
+    subparser.set_defaults(func=impl)
+
+
+@_register_func
 def where():
     node = onnx.helper.make_node(
         "Where",
@@ -30,13 +52,12 @@ def where():
     with open("where.onnx", "wb") as f:
         f.write(model.SerializeToString())
 
-    import onnxruntime as ort
-
     onnxnet = ort.InferenceSession("where.onnx")
     np_z = onnxnet.run(None, {"condition": np_condition, "x": np_x, "y": np_y})[0]
     return np_z
 
 
+@_register_func
 def resize():
     node = onnx.helper.make_node(
         "Resize",
@@ -62,13 +83,12 @@ def resize():
     with open("resize.onnx", "wb") as f:
         f.write(model.SerializeToString())
 
-    import onnxruntime as ort
-
     onnxnet = ort.InferenceSession("resize.onnx")
     np_y = onnxnet.run(None, {"x": np_x, "sizes": np_sizes})[0]
     return np_y
 
 
+@_register_func
 def scatter_nd():
     node = onnx.helper.make_node(
         "ScatterND",
@@ -126,8 +146,6 @@ def scatter_nd():
     with open("scatter_nd.onnx", "wb") as f:
         f.write(model.SerializeToString())
 
-    import onnxruntime as ort
-
     onnxnet = ort.InferenceSession(
         "scatter_nd.onnx", providers=["CUDAExecutionProvider", "CPUExecutionProvider"]
     )
@@ -137,6 +155,7 @@ def scatter_nd():
     return np_output
 
 
+@_register_func
 def nonmaxsupperssion():
     boxes = onnx.helper.make_tensor_value_info(
         "boxes",
@@ -243,13 +262,12 @@ def nonmaxsupperssion():
     with open("xp.onnx", "wb") as f:
         f.write(model.SerializeToString())
 
-    import onnxruntime as ort
-
     onnxnet = ort.InferenceSession("xp.onnx")
     o = onnxnet.run(None, {"boxes": np_boxes, "scores": np_scores})[0]
     return o
 
 
+@_register_func
 def roialign():
     x = onnx.helper.make_tensor_value_info("x", onnx.TensorProto.FLOAT, (1, 1, 10, 10))
     rois = onnx.helper.make_tensor_value_info("rois", onnx.TensorProto.FLOAT, (3, 4))
@@ -418,6 +436,7 @@ def roialign():
     return np_y
 
 
+@_register_func
 def lstm():
     seq_length = 3
     batch_size = 3
@@ -492,6 +511,7 @@ def lstm():
     return np_y, np_y_h, np_y_c
 
 
+@_register_func
 def matmul():
     np.random.seed(0)
     np_x = np.random.random(size=(2, 3, 4)).astype(np.float32)
@@ -519,24 +539,23 @@ def matmul():
     return np_y
 
 
-def conv():
-    np.random.seed(0)
-    np_x = np.random.random(size=(1, 1, 3, 3, 3)).astype(np.float32)
-    np_w = np.random.random(size=(1, 1, 3, 3, 3)).astype(np.float32)
-
-    x = onnx.helper.make_tensor_value_info("x", onnx.TensorProto.FLOAT, (1, 1, 3, 3, 3))
-    w = onnx.helper.make_tensor_value_info("w", onnx.TensorProto.FLOAT, (1, 1, 3, 3, 3))
-    y = onnx.helper.make_tensor_value_info("y", onnx.TensorProto.FLOAT, (1, 1, 3, 3, 3))
-
-    # Convolution with padding
+@_register_func
+def conv3d():
+    x_shp = [1, 3, 5, 5, 5]
+    w_shp = [4, 3, 3, 3, 3]
+    r_shp = [1, 4, 5, 5, 5]
+    x = onnx.helper.make_tensor_value_info("x", onnx.TensorProto.FLOAT, x_shp)
+    w = onnx.helper.make_tensor_value_info("w", onnx.TensorProto.FLOAT, w_shp)
+    y = onnx.helper.make_tensor_value_info("y", onnx.TensorProto.FLOAT, r_shp)
     node = onnx.helper.make_node(
         "Conv",
         inputs=["x", "w"],
         outputs=["y"],
         kernel_shape=[3, 3, 3],
         pads=[1, 1, 1, 1, 1, 1],
+        dilations=[1, 1, 1],
+        strides=[1, 1, 1],
     )
-
     graph = onnx.helper.make_graph([node], "graph", [x, w], [y], initializer=[])
     model = onnx.helper.make_model(graph)
 
@@ -544,11 +563,51 @@ def conv():
     with open("conv.onnx", "wb") as f:
         f.write(model.SerializeToString())
 
+    x_numpy = np.random.random(size=x_shp).astype(np.float32)
+    w_numpy = np.random.random(size=w_shp).astype(np.float32)
+    ins = {"x": x_numpy, "w": w_numpy}
+    np.savez("conv.npz", **ins)
     onnxnet = ort.InferenceSession("conv.onnx", providers=["CPUExecutionProvider"])
-    np_y = onnxnet.run(None, {"x": np_x, "w": np_w})
-    return np_y
+    print_numpy_array(onnxnet.run(None, ins)[0])
 
 
+@_register_func
+def groupconv3d():
+    x_shp = [1, 8, 3, 3, 3]
+    w_shp = [2, 4, 3, 3, 3]
+    y_shp = [1, 2, 3, 3, 3]
+    x = onnx.helper.make_tensor_value_info("x", onnx.TensorProto.FLOAT, x_shp)
+    w = onnx.helper.make_tensor_value_info("w", onnx.TensorProto.FLOAT, w_shp)
+    y = onnx.helper.make_tensor_value_info("y", onnx.TensorProto.FLOAT, y_shp)
+    node = onnx.helper.make_node(
+        "Conv",
+        inputs=["x", "w"],
+        outputs=["y"],
+        kernel_shape=[3, 3, 3],
+        pads=[1, 1, 1, 1, 1, 1],
+        dilations=[1, 1, 1],
+        strides=[1, 1, 1],
+        group=2,
+    )
+    graph = onnx.helper.make_graph([node], "graph", [x, w], [y], initializer=[])
+    model = onnx.helper.make_model(graph)
+
+    onnx.checker.check_model(model)
+    with open("groupconv3d.onnx", "wb") as f:
+        f.write(model.SerializeToString())
+
+    np.random.seed(0)
+    x_numpy = np.random.random(size=x_shp).astype(np.float32)
+    w_numpy = np.random.random(size=w_shp).astype(np.float32)
+    ins = {"x": x_numpy, "w": w_numpy}
+    np.savez("groupconv3d.npz", **ins)
+    onnxnet = ort.InferenceSession(
+        "groupconv3d.onnx", providers=["CPUExecutionProvider"]
+    )
+    print_numpy_array(onnxnet.run(None, ins)[0])
+
+
+@_register_func
 def einsum():
     x_shp = [2, 2]
     y_shp = [1, 2, 3]
@@ -582,5 +641,40 @@ def einsum():
     print("min: ", np.min(np_z))
 
 
+@_register_func
+def gathernd():
+    x_shp = [2, 2, 2]
+    y_shp = [2, 1, 2]
+    r_shp = [2, 1, 2]
+    x = onnx.helper.make_tensor_value_info("x", onnx.TensorProto.STRING, x_shp)
+    y = onnx.helper.make_tensor_value_info("y", onnx.TensorProto.INT64, y_shp)
+    r = onnx.helper.make_tensor_value_info("r", onnx.TensorProto.STRING, r_shp)
+
+    node = onnx.helper.make_node("GatherND", inputs=["x", "y"], outputs=["r"])
+    graph = onnx.helper.make_graph([node], "graph", [x, y], [r])
+    model = onnx.helper.make_model(graph)
+
+    onnx.checker.check_model(model)
+    with open("gathernd.onnx", "wb") as f:
+        f.write(model.SerializeToString())
+
+    x_numpy = (
+        np.array(["a", "b", "c", "d", "e", "f", "g", "h"])
+        .astype("S1")
+        .reshape([2, 2, 2])
+    )
+    y_numpy = np.array([0, 1, 1, 0], dtype=np.int64).reshape([2, 1, 2])
+    np.savez("gathernd.npz", x=x_numpy, y=y_numpy)
+
+    onnxnet = ort.InferenceSession("gathernd.onnx", providers=["CPUExecutionProvider"])
+    r_numpy = onnxnet.run(["r"], {"x": x_numpy, "y": y_numpy})
+    print(r_numpy)
+
+
 if __name__ == "__main__":
-    einsum()
+    try:
+        args = parser.parse_args()
+    except TypeError:
+        parser.print_usage()
+        exit()
+    args.func()
