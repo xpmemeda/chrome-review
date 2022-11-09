@@ -10,7 +10,7 @@ subparsers.required = True
 
 
 def print_numpy_array(arr):
-    print(arr)
+    print(arr.reshape([-1]).tolist()[:3])
     print(arr.shape)
     print(
         "min: {:.2f}, max: {:.2f}, avg: {:.2f}, var: {:.2f}".format(
@@ -512,38 +512,119 @@ def lstm():
 
 
 @_register_func
-def matmul():
+def matmul3d():
+    # 1.7   : 10ms
     np.random.seed(0)
-    np_x = np.random.random(size=(2, 3, 4)).astype(np.float32)
-    np_w = np.random.random(size=(2, 4, 5)).astype(np.float32)
 
-    # in
-    x = onnx.helper.make_tensor_value_info("x", onnx.TensorProto.FLOAT, (2, 3, 4))
-    # perameter
+    x_shp = [2, 700, 800]
+    w_shp = [2, 800, 900]
+    r_shp = [2, 700, 900]
+
+    x = onnx.helper.make_tensor_value_info("x", onnx.TensorProto.FLOAT, x_shp)
     w = onnx.helper.make_tensor(
-        "w", onnx.TensorProto.FLOAT, [2, 4, 5], np_w.reshape(-1).tolist()
+        "w",
+        onnx.TensorProto.FLOAT,
+        w_shp,
+        np.random.random(size=w_shp).astype(np.float32).reshape([-1]).tolist(),
     )
-    # out
-    y = onnx.helper.make_tensor_value_info("y", onnx.TensorProto.FLOAT, (2, 3, 5))
+    r = onnx.helper.make_tensor_value_info("r", onnx.TensorProto.FLOAT, r_shp)
 
-    node = onnx.helper.make_node("MatMul", inputs=["x", "w"], outputs=["y"])
-    graph = onnx.helper.make_graph([node], "graph", [x], [y], initializer=[w])
+    node = onnx.helper.make_node("MatMul", inputs=["x", "w"], outputs=["r"])
+    graph = onnx.helper.make_graph([node], "graph", [x], [r], initializer=[w])
+    model = onnx.helper.make_model(graph)
+
+    filename = "matmul3d"
+    onnx.checker.check_model(model)
+    with open(filename + ".onnx", "wb") as f:
+        f.write(model.SerializeToString())
+
+    x_numpy = np.random.random(size=x_shp).astype(np.float32)
+    ins = {"x": x_numpy}
+    np.savez(filename + ".npz", **ins)
+
+    onnxnet = ort.InferenceSession(
+        filename + ".onnx", providers=["CPUExecutionProvider"]
+    )
+    r_numpy = onnxnet.run(None, ins)
+    print_numpy_array(r_numpy[0])
+
+
+@_register_func
+def conv2d():
+    # 2.7.1: 82ms
+    # 1.7  : 48ms
+    x_shp = [2, 8, 800, 800]
+    w_shp = [8, 8, 3, 3]
+    r_shp = [2, 8, 800, 800]
+    x = onnx.helper.make_tensor_value_info("x", onnx.TensorProto.FLOAT, x_shp)
+    w = onnx.helper.make_tensor_value_info("w", onnx.TensorProto.FLOAT, w_shp)
+    r = onnx.helper.make_tensor_value_info("r", onnx.TensorProto.FLOAT, r_shp)
+    node = onnx.helper.make_node(
+        "Conv",
+        inputs=["x", "w"],
+        outputs=["r"],
+        kernel_shape=[3, 3],
+        pads=[1, 1, 1, 1],
+        dilations=[1, 1],
+        strides=[1, 1],
+    )
+    graph = onnx.helper.make_graph([node], "graph", [x, w], [r], initializer=[])
     model = onnx.helper.make_model(graph)
 
     onnx.checker.check_model(model)
-    with open("matmul.onnx", "wb") as f:
+    with open("conv2d.onnx", "wb") as f:
         f.write(model.SerializeToString())
 
-    onnxnet = ort.InferenceSession("matmul.onnx", providers=["CPUExecutionProvider"])
-    np_y = onnxnet.run(None, {"x": np_x})
-    return np_y
+    x_numpy = np.random.random(size=x_shp).astype(np.float32)
+    w_numpy = np.random.random(size=w_shp).astype(np.float32)
+    ins = {"x": x_numpy, "w": w_numpy}
+    np.savez("conv2d.npz", **ins)
+    onnxnet = ort.InferenceSession("conv2d.onnx", providers=["CPUExecutionProvider"])
+    print_numpy_array(onnxnet.run(None, ins)[0])
+
+
+@_register_func
+def groupconv2d():
+    x_shp = [2, 24, 800, 800]
+    w_shp = [24, 1, 3, 3]
+    r_shp = [2, 24, 800, 800]
+    x = onnx.helper.make_tensor_value_info("x", onnx.TensorProto.FLOAT, x_shp)
+    w = onnx.helper.make_tensor_value_info("w", onnx.TensorProto.FLOAT, w_shp)
+    r = onnx.helper.make_tensor_value_info("r", onnx.TensorProto.FLOAT, r_shp)
+    node = onnx.helper.make_node(
+        "Conv",
+        inputs=["x", "w"],
+        outputs=["r"],
+        kernel_shape=[3, 3],
+        pads=[1, 1, 1, 1],
+        dilations=[1, 1],
+        strides=[1, 1],
+        group=24,
+    )
+    graph = onnx.helper.make_graph([node], "graph", [x, w], [r], initializer=[])
+    model = onnx.helper.make_model(graph)
+
+    onnx.checker.check_model(model)
+    with open("groupconv2d.onnx", "wb") as f:
+        f.write(model.SerializeToString())
+
+    x_numpy = np.random.random(size=x_shp).astype(np.float32)
+    w_numpy = np.random.random(size=w_shp).astype(np.float32)
+    ins = {"x": x_numpy, "w": w_numpy}
+    np.savez("groupconv2d.npz", **ins)
+    onnxnet = ort.InferenceSession(
+        "groupconv2d.onnx", providers=["CPUExecutionProvider"]
+    )
+    print_numpy_array(onnxnet.run(None, ins)[0])
 
 
 @_register_func
 def conv3d():
-    x_shp = [1, 3, 5, 5, 5]
-    w_shp = [4, 3, 3, 3, 3]
-    r_shp = [1, 4, 5, 5, 5]
+    # 2.7.1: 2500ms
+    # 1.7  : 1450ms
+    x_shp = [2, 8, 224, 224, 224]
+    w_shp = [8, 8, 3, 3, 3]
+    r_shp = [2, 8, 224, 224, 224]
     x = onnx.helper.make_tensor_value_info("x", onnx.TensorProto.FLOAT, x_shp)
     w = onnx.helper.make_tensor_value_info("w", onnx.TensorProto.FLOAT, w_shp)
     y = onnx.helper.make_tensor_value_info("y", onnx.TensorProto.FLOAT, r_shp)
@@ -560,22 +641,22 @@ def conv3d():
     model = onnx.helper.make_model(graph)
 
     onnx.checker.check_model(model)
-    with open("conv.onnx", "wb") as f:
+    with open("conv3d.onnx", "wb") as f:
         f.write(model.SerializeToString())
 
     x_numpy = np.random.random(size=x_shp).astype(np.float32)
     w_numpy = np.random.random(size=w_shp).astype(np.float32)
     ins = {"x": x_numpy, "w": w_numpy}
-    np.savez("conv.npz", **ins)
-    onnxnet = ort.InferenceSession("conv.onnx", providers=["CPUExecutionProvider"])
+    np.savez("conv3d.npz", **ins)
+    onnxnet = ort.InferenceSession("conv3d.onnx", providers=["CPUExecutionProvider"])
     print_numpy_array(onnxnet.run(None, ins)[0])
 
 
 @_register_func
 def groupconv3d():
-    x_shp = [1, 8, 3, 3, 3]
-    w_shp = [2, 4, 3, 3, 3]
-    y_shp = [1, 2, 3, 3, 3]
+    x_shp = [2, 24, 8, 112, 112]
+    w_shp = [24, 1, 5, 1, 1]
+    y_shp = [2, 24, 8, 112, 112]
     x = onnx.helper.make_tensor_value_info("x", onnx.TensorProto.FLOAT, x_shp)
     w = onnx.helper.make_tensor_value_info("w", onnx.TensorProto.FLOAT, w_shp)
     y = onnx.helper.make_tensor_value_info("y", onnx.TensorProto.FLOAT, y_shp)
@@ -583,11 +664,11 @@ def groupconv3d():
         "Conv",
         inputs=["x", "w"],
         outputs=["y"],
-        kernel_shape=[3, 3, 3],
-        pads=[1, 1, 1, 1, 1, 1],
+        kernel_shape=[5, 1, 1],
+        pads=[2, 0, 0, 2, 0, 0],
         dilations=[1, 1, 1],
         strides=[1, 1, 1],
-        group=2,
+        group=24,
     )
     graph = onnx.helper.make_graph([node], "graph", [x, w], [y], initializer=[])
     model = onnx.helper.make_model(graph)
