@@ -1,5 +1,4 @@
 build
-build-debug
-build-release
+build-*
 hello-world
 __pycache__
