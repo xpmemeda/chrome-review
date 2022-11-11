@@ -513,7 +513,8 @@ def lstm():
 
 @_register_func
 def matmul3d():
-    # 1.7   : 10ms
+    # 1.7   : thread-num=1, 20ms
+    # 2.7.1 : thread-num=1, 20ms
     np.random.seed(0)
 
     x_shp = [2, 700, 800]
@@ -551,8 +552,8 @@ def matmul3d():
 
 @_register_func
 def conv2d():
-    # 2.7.1: 82ms
-    # 1.7  : 48ms
+    # 2.7.1: thread-num=1, 88ms
+    # 1.7  : thread-num=1, 106ms
     x_shp = [2, 8, 800, 800]
     w_shp = [8, 8, 3, 3]
     r_shp = [2, 8, 800, 800]
@@ -620,11 +621,11 @@ def groupconv2d():
 
 @_register_func
 def conv3d():
-    # 2.7.1: 2500ms
-    # 1.7  : 1450ms
-    x_shp = [2, 8, 224, 224, 224]
+    # 2.7.1: thread-num=1, 317ms
+    # 1.7  : thread-num=1, 400ms
+    x_shp = [2, 8, 112, 112, 112]
     w_shp = [8, 8, 3, 3, 3]
-    r_shp = [2, 8, 224, 224, 224]
+    r_shp = [2, 8, 112, 112, 112]
     x = onnx.helper.make_tensor_value_info("x", onnx.TensorProto.FLOAT, x_shp)
     w = onnx.helper.make_tensor_value_info("w", onnx.TensorProto.FLOAT, w_shp)
     y = onnx.helper.make_tensor_value_info("y", onnx.TensorProto.FLOAT, r_shp)
@@ -654,6 +655,8 @@ def conv3d():
 
 @_register_func
 def groupconv3d():
+    # 2.7.1 : thread-num=1, 20ms
+    # 1.7   : thread-num=1, 100ms
     x_shp = [2, 24, 8, 112, 112]
     w_shp = [24, 1, 5, 1, 1]
     y_shp = [2, 24, 8, 112, 112]
