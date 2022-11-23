@@ -89,6 +89,62 @@ def resize():
 
 
 @_register_func
+def expand():
+    x_shp = [3, 1]
+    y_shp = [3]
+    r_shp = [2, 3, 4]
+    x = onnx.helper.make_tensor_value_info('x', onnx.TensorProto.FLOAT, x_shp)
+    y = onnx.helper.make_tensor_value_info('y', onnx.TensorProto.INT64, y_shp)
+    r = onnx.helper.make_tensor_value_info('r', onnx.TensorProto.FLOAT, r_shp)
+
+    expand = onnx.helper.make_node('Expand', inputs=['x', 'y'], outputs=['r'])
+    g = onnx.helper.make_graph([expand], 'g', [x, y], [r])
+    m = onnx.helper.make_model(g)
+
+    onnx.checker.check_model(m)
+    with open('expand.onnx', 'wb') as f:
+        f.write(m.SerializeToString())
+
+    np.random.seed(0)
+    x_numpy = np.random.randint(-128, 128, size=[3, 1]).astype(np.float32)
+    y_numpy = np.array([2, 3, 4]).astype(np.int64)
+    ins = {'x': x_numpy, 'y': y_numpy}
+    np.savez('expand.npz', **ins)
+
+    onnxnet = ort.InferenceSession('expand.onnx', providers=['CPUExecutionProvider'])
+    r_numpy = onnxnet.run(['r'], ins)
+    print(r_numpy)
+
+
+@_register_func
+def not_():
+    x_shp = [2, 3]
+    y_shp = [2, 3]
+    r_shp = [2, 3]
+    x = onnx.helper.make_tensor_value_info('x', onnx.TensorProto.INT64, x_shp)
+    y = onnx.helper.make_tensor_value_info('y', onnx.TensorProto.INT64, y_shp)
+    r = onnx.helper.make_tensor_value_info('r', onnx.TensorProto.BOOL, r_shp)
+
+    equal = onnx.helper.make_node('Equal', inputs=['x', 'y'], outputs=['equal'])
+    not_ = onnx.helper.make_node('Not', inputs=['equal'], outputs=['r'])
+    g = onnx.helper.make_graph([equal, not_], 'g', [x, y], [r])
+    m = onnx.helper.make_model(g)
+
+    onnx.checker.check_model(m)
+    with open('not.onnx', 'wb') as f:
+        f.write(m.SerializeToString())
+
+    x_numpy = np.array([0, 1, 0, 2, 0, 3]).reshape(x_shp).astype(np.int64)
+    y_numpy = np.array([0, 1, 2, 2, 3, 0]).reshape(y_shp).astype(np.int64)
+    ins = {'x': x_numpy, 'y': y_numpy}
+    np.savez('not.npz', **ins)
+
+    onnxnet = ort.InferenceSession('not.onnx', providers=['CPUExecutionProvider'])
+    r_numpy = onnxnet.run(['r'], ins)
+    print(r_numpy)
+
+
+@_register_func
 def scatter_nd():
     node = onnx.helper.make_node(
         "ScatterND",
