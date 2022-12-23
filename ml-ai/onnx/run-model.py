@@ -49,7 +49,7 @@ def run_model(args):
     out_names = [i.name for i in session.get_outputs()]
 
     numpy_ins = np.load(args.ins_file)
-    feeds = {k: numpy_ins.get(k.name) for k in session.get_inputs()}
+    feeds = {k.name: numpy_ins.get(k.name) for k in session.get_inputs()}
 
     numpy_outs = session.run(out_names, feeds)
 
