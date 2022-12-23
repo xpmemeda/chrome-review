@@ -31,7 +31,6 @@ def rmdir(dirname):
 @_register_func
 def bucketize():
     x = tf.placeholder(tf.float32, [2, 2])
-    # boundaries = tf.constant([-1, 0, 1], tf.float32)
     y = tf.raw_ops.Bucketize(input=x, boundaries=[-1, 0, 1])
 
     dirname = "bucketize"
@@ -179,11 +178,42 @@ def stringtohashbucketstrong():
 
 
 @_register_func
+def sparsefillemptyrows():
+    tf.reset_default_graph()
+    x = tf.placeholder(tf.int64, [3, 1], "x")
+    y = tf.placeholder(tf.float32, [3], "y")
+    dense_shape = tf.constant([5], tf.int64)
+    default_val = tf.constant(-1, tf.float32)
+    r = tf.raw_ops.SparseFillEmptyRows(
+        indices=x, values=y, dense_shape=dense_shape, default_value=default_val
+    )
+
+    dirname = "sparsefillemptyrows"
+    rmdir(dirname)
+    x_numpy = np.array([[0], [1], [3]]).astype(np.int64)
+    y_numpy = np.array([1.0, 1.0, 1.0]).astype(np.float32)
+    np.savez(dirname + ".npz", x=x_numpy, y=y_numpy)
+    with tf.Session() as sess:
+        print(
+            sess.run(
+                [r.output_indices, r.output_values, r.empty_row_indicator],
+                feed_dict={"x:0": x_numpy, "y:0": y_numpy},
+            )
+        )
+        tf.saved_model.simple_save(
+            sess,
+            dirname,
+            inputs={"x": x, "y": y},
+            outputs={"r_indices": r.output_indices, "r_values": r.output_values},
+        )
+
+
+@_register_func
 def sparsetodense():
     tf.reset_default_graph()
     x = tf.placeholder(tf.string, [2], "x")
     r = tf.raw_ops.SparseToDense(
-        sparse_indices=[[0, 0], [1, 2]],
+        sparse_indices=[[1, 2], [0, 0]],
         output_shape=[2, 3],
         sparse_values=x,
         default_value=".....",
