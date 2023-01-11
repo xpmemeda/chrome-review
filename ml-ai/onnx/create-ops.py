@@ -25,6 +25,35 @@ def _register_func(impl):
 
 
 @_register_func
+def slice():
+    slice = onnx.helper.make_node("Slice", inputs=['x', 'starts', 'ends', 'axes', 'steps'], outputs=['r'])
+
+    x = onnx.helper.make_tensor_value_info('x', onnx.TensorProto.FLOAT, [3, 4])
+    x_numpy = np.random.random(size=[3, 4]).astype(np.float32)
+    print(x_numpy)
+    starts = onnx.helper.make_tensor_value_info('starts', onnx.TensorProto.INT64, [1])
+    starts_numpy = np.array([-1]).astype(np.int64)
+    ends = onnx.helper.make_tensor_value_info('ends', onnx.TensorProto.INT64, [1])
+    ends_numpy = np.array([-200]).astype(np.int64)
+    axes = onnx.helper.make_tensor_value_info('axes', onnx.TensorProto.INT64, [1])
+    axes_numpy = np.array([0]).astype(np.int64)
+    steps = onnx.helper.make_tensor_value_info('steps', onnx.TensorProto.INT64, [1])
+    steps_numpy = np.array([-1]).astype(np.int64)
+
+    r = onnx.helper.make_tensor_value_info('r', onnx.TensorProto.FLOAT, [3, 4])
+
+    g = onnx.helper.make_graph([slice], 'g', [x, starts, ends, axes, steps], [r], initializer=[])
+    m = onnx.helper.make_model(g)
+    onnx.checker.check_model(m)
+    with open('slice.onnx', 'wb') as f:
+        f.write(m.SerializeToString())
+
+    onnxnet = ort.InferenceSession('slice.onnx', providers=['CPUExecutionProvider'])
+    r_numpy = onnxnet.run(None, {'x': x_numpy, 'starts': starts_numpy, 'ends': ends_numpy, 'axes': axes_numpy, 'steps': steps_numpy})[0]
+    print(r_numpy)
+
+
+@_register_func
 def where():
     node = onnx.helper.make_node(
         "Where",
