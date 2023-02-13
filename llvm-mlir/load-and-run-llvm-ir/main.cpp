@@ -44,12 +44,10 @@ int main(int argc, char *argv[]) {
   auto jit = err(llvm::orc::LLJITBuilder().create());
   err(jit->addIRModule(std::move(tsm)));
   auto generator =
-      err(llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
-          jit->getDataLayout().getGlobalPrefix()));
+      err(llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(jit->getDataLayout().getGlobalPrefix()));
   jit->getMainJITDylib().addGenerator(std::move(generator));
   using FunctionType = void (*)();
-  auto fun =
-      reinterpret_cast<FunctionType>(err(jit->lookup("func")).getAddress());
+  auto fun = reinterpret_cast<FunctionType>(err(jit->lookup("func")).getAddress());
   fun();
 
   return 0;
