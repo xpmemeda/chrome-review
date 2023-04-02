@@ -1,38 +1,52 @@
-syntax = "proto2";
+syntax = "proto3";
 
 package tutorial;
 
-enum PbEnum {
-  PbEnum_X = 1;
-  PbEnum_Y = 2;
+// A1 -> A2 is Ok.
+message A1 { string a1 = 1; }
+message A2 { string a2 = 1; }
+
+// B1 -> B2 is Ok.
+message B1 { string b1 = 1; }
+message B2 {
+  oneof b {
+    string b2_1 = 1;
+    string b2_2 = 11;
+  }
 }
 
-message Person {
-  optional string name = 1;
-  optional int32 id = 2;
-  optional string email = 3;
-
-  enum PhoneType {
-    MOBILE = 0;
-    HOME = 1;
-    WORK = 2;
-  }
-
-  message PhoneNumber {
-    optional string number = 1;
-    optional PhoneType type = 2 [default = HOME];
-  }
-
-  repeated PhoneNumber phones = 4;
+// C1 -> C2 is Not ok.
+message C1 { string c1 = 1; }
+message C2 {
+  message C2_Internal { string c2_internal = 1; }
+  C2_Internal c2 = 1;
 }
 
-message AddressBook {
-  repeated Person people = 1;
-  message Dimension {
-    oneof DimensionValue {
-      uint32 value = 1;
-      string param = 2;
-    }
+// proto3: The first enum value must be zero.
+// proto2: The first enum value is allowed to be non-zero, and it will be the default value
+enum EnumD {
+  X = 0;
+  Y = 1;
+}
+
+// E1 -> E2 or E3 is Ok.
+message E1 { int32 e1 = 1; }
+message E2 { int64 e2 = 1; }
+message E3 {
+  enum E_Internal {
+    X = 0;
+    Y = 1;
   }
-  optional Dimension dimension = 2;
+  E_Internal e3 = 1;
+}
+
+// F1 -> F2 is Ok.
+// string or bytes is safe, but numeric types not.
+message F1 {
+  string f1_1 = 1;
+  int32 f1_2 = 2;
+}
+message F2 {
+  repeated string f2_1 = 1;
+  repeated int32 f2_2 = 2;
 }
