@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
-project(main)
+
+project(hello-world)
 
 set (CMAKE_CXX_STANDARD 11)
 
@@ -19,5 +20,5 @@ protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS addressbook.proto)
 include_directories(${Protobuf_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-add_executable(main main.cpp ${PROTO_SRCS} ${PROTO_HDRS})
-target_link_libraries(main ${Protobuf_LIBRARIES})
+add_executable(${PROJECT_NAME} main.cpp ${PROTO_SRCS} ${PROTO_HDRS})
+target_link_libraries(${PROJECT_NAME} ${Protobuf_LIBRARIES})
