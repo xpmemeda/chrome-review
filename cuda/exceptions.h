@@ -16,6 +16,7 @@ class CUDADriverError : public std::exception {
     cuGetErrorString(status, &err_msg);
     err_msg_.append(err_msg);
   }
+  CUDADriverError(CUresult status) : CUDADriverError(status, "") {}
 
   const char* what() const noexcept override { return err_msg_.c_str(); }
 
@@ -28,8 +29,9 @@ class CUDARuntimeError : public std::exception {
   CUDARuntimeError(cudaError_t status, const char* err_msg) {
     err_msg_.append(err_msg).append(", cuda err msg: ").append(cudaGetErrorString(status));
   }
+  CUDARuntimeError(cudaError_t status) : CUDARuntimeError(status, "") {}
 
-  const char* what() const noexcept override { err_msg_.c_str(); }
+  const char* what() const noexcept override { return err_msg_.c_str(); }
 
  private:
   std::string err_msg_;
@@ -40,6 +42,7 @@ class CUBLASRuntimeError : public std::exception {
   CUBLASRuntimeError(cublasStatus_t status, const char* err_msg) {
     err_msg_.append(err_msg).append(", cuda err msg: ").append(cublasGetErrorString(status));
   }
+  CUBLASRuntimeError(cublasStatus_t status) : CUBLASRuntimeError(status, "") {}
 
   const char* what() const noexcept override { return err_msg_.c_str(); }
 
@@ -80,8 +83,9 @@ class CUDNNRuntimeError : public std::exception {
   CUDNNRuntimeError(cudnnStatus_t status, const char* err_msg) {
     err_msg_.append(err_msg).append(", cuda err msg: ").append(cudnnGetErrorString(status));
   }
+  CUDNNRuntimeError(cudnnStatus_t status) : CUDNNRuntimeError(status, "") {}
 
-  const char* what() const noexcept override { err_msg_.c_str(); };
+  const char* what() const noexcept override { return err_msg_.c_str(); };
 
  private:
   std::string err_msg_;
@@ -89,6 +93,11 @@ class CUDNNRuntimeError : public std::exception {
 
 template <typename T>
 inline void check_cuda_err(T, const char* msg);
+
+template <typename T>
+inline void check_cuda_err(T err_code) {
+  return check_cuda_err(err_code, "");
+}
 
 template <>
 inline void check_cuda_err<CUresult>(CUresult ret, const char* msg) {
