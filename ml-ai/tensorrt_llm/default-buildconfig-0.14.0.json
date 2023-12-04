@@ -15,7 +15,7 @@
     "profiling_verbosity": "layer_names_only",
     "enable_debug_output": false,
     "max_draft_len": 0,
-    "speculative_decoding_mode": 0,
+    "speculative_decoding_mode": 1,
     "use_refit": false,
     "input_timing_cache": null,
     "output_timing_cache": "model.cache",
