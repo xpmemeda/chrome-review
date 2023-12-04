@@ -2,8 +2,9 @@ import argparse
 import time
 import wonderwords
 
+import tensorrt_llm as trtllm
+
 from transformers import AutoTokenizer, PreTrainedTokenizer, PreTrainedTokenizerFast
-from tensorrt_llm import LLM, SamplingParams, BuildConfig
 
 
 def get_tokenizer(model: str) -> PreTrainedTokenizer | PreTrainedTokenizerFast:
@@ -24,56 +25,51 @@ def get_prompts(num_prompts, input_len, tokenizer):
     return prompts
 
 
-def main(args):
-    if args.engine_dir is None:
-        build_config = BuildConfig(
-            max_batch_size=args.batch_size,
-            opt_batch_size=args.batch_size,
-            max_seq_len=2048,
-        )
-        build_config = BuildConfig.from_json_file("default-buildconfig-0.14.0.json")
-        build_config.update_from_dict({"max_batch_size": args.batch_size})
-        llm = LLM(
-            model=args.model_dir,
-            tokenizer=get_tokenizer(args.model_dir),
-            trust_remote_code=True,
-            dtype="float16",
-            build_config=build_config,
-        )
-        llm.save("b%d.engine" % args.batch_size)
-    else:
-        llm = LLM(
-            model=args.engine_dir,
-            tokenizer=get_tokenizer(args.model_dir),
-            dtype="float16",
-        )
-    llm.generate("hello", sampling_params=SamplingParams(max_new_tokens=1))  # warm up.
+def build_config(arguments):
+    return trtllm.BuildConfig(
+        max_batch_size=arguments.batch_size,
+        opt_batch_size=arguments.batch_size,
+        max_seq_len=2048,
+        plugin_config=trtllm.builder.PluginConfig.from_dict(
+            {"dtype": "float16", "gemm_plugin": "float16"}
+        ),
+    )
 
-    tokenizer = get_tokenizer(args.model_dir)
-    prompts = get_prompts(args.num_prompts, args.input_len, tokenizer)
 
-    # 0.14.0: hlapi/utils.py
-    # 0.15.0: llmapi/utils.py:SamplingParams
-    sampling_params = SamplingParams(
+def main(arguments):
+    llm = trtllm.LLM(
+        model=arguments.model_dir,
+        tokenizer=arguments.model_dir,
+        trust_remote_code=True,
+        dtype="float16",
+        build_config=build_config(arguments),
+    )
+
+    llm.generate("hello")  # warm up.
+
+    tokenizer = get_tokenizer(arguments.model_dir)
+    prompts = get_prompts(arguments.num_prompts, arguments.input_len, tokenizer)
+
+    sampling_params = trtllm.SamplingParams(
         temperature=0.5,
-        min_tokens=args.output_len,
-        max_tokens=args.output_len,
+        min_tokens=arguments.output_len,
+        max_tokens=arguments.output_len,
     )
 
     t1 = time.time()
     outputs = llm.generate(prompts, sampling_params=sampling_params)
     t2 = time.time()
 
-    assert len(outputs) == args.num_prompts
+    assert len(outputs) == arguments.num_prompts
     for request_output in outputs:
-        assert len(request_output.prompt_token_ids) == args.input_len
+        assert len(request_output.prompt_token_ids) == arguments.input_len
         assert len(request_output.outputs) == 1
-        assert len(request_output.outputs[0].token_ids) == args.output_len
+        assert len(request_output.outputs[0].token_ids) == arguments.output_len
 
     elapsed_time = t2 - t1
 
-    num_prompts = args.num_prompts
-    num_tokens = args.num_prompts * (args.input_len + args.output_len)
+    num_prompts = arguments.num_prompts
+    num_tokens = arguments.num_prompts * (arguments.input_len + arguments.output_len)
 
     print(
         f"Throughput: {num_prompts / elapsed_time:.2f} requests/s, "
@@ -90,8 +86,7 @@ if __name__ == "__main__":
     parser.add_argument("--num-prompts", type=int, required=True)
     parser.add_argument("--input-len", type=int, required=True)
     parser.add_argument("--output-len", type=int, required=True)
-    parser.add_argument("--engine-dir", type=str)
 
-    args = parser.parse_args()
+    arguments = parser.parse_args()
 
-    main(args)
+    main(arguments)
