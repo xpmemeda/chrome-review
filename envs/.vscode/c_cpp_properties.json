@@ -1,0 +1,21 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}",
+                "${workspaceFolder}/build",
+                "${HOME}/local/cuda/include",
+                "${HOME}/local/llvm/include",
+                "${HOME}/workspace/git-repos/pybind11/include",
+                "${PYTHON_SITELIB}/torch/include",
+                "${PYTHON_SITELIB}/torch/include/torch/csrc/api/include",
+
+                "${HOME}/local/wnr-targets/include"
+            ],
+            "defines": [],
+            "compilerPath": "${HOME}/local/gcc/bin/gcc"
+        }
+    ],
+    "version": 4
+}
