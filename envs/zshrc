@@ -1,0 +1,58 @@
+export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME="ys"
+plugins=(git zsh-autosuggestions zsh-syntax-highlighting)
+source $ZSH/oh-my-zsh.sh
+
+function rkill() { ps -u | grep $1 | awk '{print $2}' | xargs kill -9; }
+function rcpu() { top -bn 1 | grep $1 | awk '{sum+=$9;}END{print sum"%"}'; }
+function rwatch-cpu() { watch -n 1 "top -bn 1 | grep $1 | awk '{sum+=\$9;}END{print sum\"%\"}'"; }
+function rcpus() { top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1"%"}'; }
+function rwatch-cpus() { watch -n 1 "top -bn1 | grep \"Cpu(s)\" | sed \"s/.*, *\([0-9.]*\)%* id.*/\1/\" | awk '{print 100 - \$1\"%\"}'"; }
+
+export PS1="(python-3.8) (wxg-gcc-7.5) ${PS1-}"
+
+export WNRHOME=/home/wnr
+
+if [ "$VSCODE_GIT_ASKPASS_NODE" != "" ] ; then
+    export PATH=${VSCODE_GIT_ASKPASS_NODE:0:-5}/bin/remote-cli
+else
+    export PATH=
+fi
+export PATH=/usr/local/bin:/usr/bin:${PATH}
+export PATH=/usr/local/cuda/bin:${PATH}
+export PATH=${HOME}/.ft:${PATH}
+export PATH=${HOME}/local/bin:${PATH}
+export PATH=${HOME}/local/protobuf/bin:${HOME}/local/patchelf/bin:${HOME}/local/binutils/bin:${PATH}
+export PATH=${WNRHOME}/local/gcc7.5/bin:${PATH}
+export PATH=${HOME}/envs/cp38/bin:${PATH}
+
+export CPATH=
+export CPATH=${WNRHOME}/local/highwayhash:${WNRHOME}/local/farmhash:${WNRHOME}/local/svml:${WNRHOME}/local/mlas:${CPATH}
+export LIBRARY_PATH=
+export LIBRARY_PATH=${WNRHOME}/local/mlas:${LIBRARY_PATH}
+export LD_LIBRARY_PATH=
+export LD_LIBRARY_PATH=/usr/local/lib:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
+export LD_LIBRARY_PATH=${HOME}/local/protobuf/lib:${LD_LIBRARY_PATH}
+export LD_LIBRARY_PATH=${WNRHOME}/local/gcc7.5/lib64:${LD_LIBRARY_PATH}
+
+export CMAKE_PREFIX_PATH=
+export CMAKE_PREFIX_PATH=${HOME}/local:${CMAKE_PREFIX_PATH}
+export CMAKE_PREFIX_PATH=${WNRHOME}/local/llvm-mlir-16x:${WNRHOME}/local/oneDNN:${CMAKE_PREFIX_PATH}
+export CMAKE_PREFIX_PATH=${WNRHOME}/local/highwayhash:${WNRHOME}/local/farmhash:${WNRHOME}/local/svml:${WNRHOME}/local/mlas:${CMAKE_PREFIX_PATH}
+export CMAKE_PREFIX_PATH=${HOME}/local/protobuf:${CMAKE_PREFIX_PATH}
+
+export CC=${WNRHOME}/local/gcc7.5/bin/gcc
+export CXX=${WNRHOME}/local/gcc7.5/bin/g++
+
+export GIT_LFS_SKIP_SMUDGE=1
+export CUDA_VISIBLE_DEVICES=0
+export DNNL_HOME=${WNRHOME}/local/oneDNN
+export VECTORCLASS_HOME=${HOME}/workspace/vectorclass
+
+alias code-wnr="code ${HOME}/workspace/wnr"
+alias wnr="${HOME}/workspace/wnr"
+alias code-tfcc="code ${HOME}/workspace/tfcc"
+alias tfcc="${HOME}/workspace/tfcc"
+alias code-r="code ${HOME}/workspace/chrome-review"
+alias r="${HOME}/workspace/chrome-review"
+alias gs="git status"
