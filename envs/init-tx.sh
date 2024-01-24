@@ -1,0 +1,60 @@
+CMAKE_HOME=$HOME/local/cmake
+GCC_HOME=$HOME/local/gcc
+CPYTHON_HOME=$HOME/local/cpython
+CUDA_HOME=$HOME/local/cuda
+LLVM_HOME=$HOME/local/llvm
+ONEDNN_HOME=$HOME/local/oneDNN
+PROTOBUF_HOME=$HOME/local/protobuf
+VECTORCLASS_HOME=$HOME/local/vectorclass
+CUDNN_HOME=$HOME/local/cudnn
+
+FARM_HASH_HOME=$HOME/local/wnr-deps/farmhash
+HIGHWAY_HASH_HOME=$HOME/local/wnr-deps/highwayhash
+MLAS_HOME=$HOME/local/wnr-deps/mlas
+SVML_HOME=$HOME/local/wnr-deps/svml
+
+wnr_dep_libs=(
+    "$CMAKE_HOME"
+    "$GCC_HOME"
+    "$CPYTHON_HOME"
+    "$CUDA_HOME"
+    "$LLVM_HOME"
+    "$ONEDNN_HOME"
+    "$PROTOBUF_HOME"
+    "$VECTORCLASS_HOME"
+    "$FARM_HASH_HOME"
+    "$HIGHWAY_HASH_HOME"
+    "$MLAS_HOME"
+    "$SVML_HOME"
+    "$CUDNN_HOME"
+)
+any_path_missing=false
+for path in "${wnr_dep_libs[@]}"; do
+    if [ ! -e "$path" ]; then
+        echo -e "\033[31mPath does not exist: $path\033[0m"
+        any_path_missing=true
+    fi
+done
+if [[ "$any_path_missing" == "true" ]]; then
+    exit 1
+fi
+
+export PATH=
+export PATH=/usr/local/bin:/usr/bin:$PATH
+export PATH=$CPYTHON_HOME/bin:$CUDA_HOME/bin:$CMAKE_HOME/bin:$GCC_HOME/bin:$PATH
+export PATH=$HOME/.ft:$PATH
+export LD_LIBRARY_PATH=
+export LD_LIBRARY_PATH=$GCC_HOME/lib64:$LD_LIBRARY_PATH
+export CMAKE_PREFIX_PATH=
+export CMAKE_PREFIX_PATH=$HOME/local:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=$ONEDNN_HOME:$PROTOBUF_HOME:$LLVM_HOME:$CMAKE_PREFIX_PATH
+export CUDNN_HOME FARM_HASH_HOME HIGHWAY_HASH_HOME MLAS_HOME SVML_HOME
+export VECTORCLASS_HOME DNNL_HOME=$ONEDNN_HOME
+
+export CC=$(which gcc)
+export CXX=$(which g++)
+
+gcc_version=$(gcc --version 2>&1 | grep -oP '[0-9]+\.[0-9]+\.[0-9]+')
+python_version=$(python -c "import sys; print('.'.join(map(str, sys.version_info[:2])))" 2>/dev/null)
+export PS1=$'\033[0;32m'"(python-$python_version) (gcc-$gcc_version)"$'\033[0m'"${PS1-}"
+export PYTHON_SITELIB=$CPYTHON_HOME/lib/python${python_version}/site-packages
