@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}",
+                "${workspaceFolder}/build",
+                "/usr/local/cuda/include",
+                "${HOME}/workspace/git-repos/pybind11/include",
+                "${PYTHON_SITELIB}/tensorflow/include",
+                "${PYTHON_SITELIB}/torch/include",
+                "${PYTHON_SITELIB}/torch/include/torch/csrc/api/include",
+                "${WNRHOME}/local/python38/include/python3.8",
+                "${WNRHOME}/local/oneDNN/include",
+                "${WNRHOME}/local/llvm-mlir-16x/include"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/local/bin/clang"
+        }
+    ],
+    "version": 4
+}

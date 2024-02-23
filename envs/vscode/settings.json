@@ -1,0 +1,28 @@
+{
+    "editor.formatOnSave": true,
+    "python.terminal.activateEnvironment": false,
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter"
+    },
+    "[cpp]": {
+        "editor.defaultFormatter": "xaver.clang-format"
+    },
+    "files.associations": {
+        "*.h": "cpp",
+        "*.cpp": "cpp",
+        "*.inc": "cpp",
+        "*.cu": "cuda-cpp",
+        "*.tcc": "cpp",
+        "istream": "cpp",
+        "tuple": "cpp",
+        "array": "cpp",
+        "functional": "cpp",
+        "utility": "cpp",
+        "future": "cpp",
+        "memory": "cpp",
+        "variant": "cpp",
+        "locale": "cpp",
+        "thread": "cpp",
+        "chrono": "cpp"
+    }
+}
