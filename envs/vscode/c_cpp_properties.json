@@ -1,0 +1,18 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}",
+                "${workspaceFolder}/**",
+                "${HOME}/workspace/git-repos/pybind11/include",
+                "${HOME}/envs/cp38/lib/python3.8/site-packages/tensorflow/include",
+                "${WNRHOME}/local/oneDNN/include",
+                "${WNRHOME}/local/llvm-mlir-16x/include",
+            ],
+            "defines": [],
+            "compilerPath": "/usr/local/bin/clang"
+        }
+    ],
+    "version": 4
+}
