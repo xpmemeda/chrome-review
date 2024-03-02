@@ -3,73 +3,52 @@ import re
 import statistics
 
 
-def extract_prefix_float(string):
+def extract_value_and_unit(string):
     nums = re.findall("\d+\.\d+", string)
+    unit = re.findall("μs|ms", string)
     assert len(nums) == 1, string
-    return float(nums[0])
+    assert len(unit) == 1, string
+    return float(nums[0]), unit[0]
 
 
-def analys_nsys(file, primary_index, index):
-    items = {}
+def analys_nsys(file, index):
+    r"""
+    Sum the value of specific index in a nsys ``Events View``.
+
+    Args:
+        file: str, the txt file contenting ``Events View``.
+        index: int, the index to read value and sum it.
+
+    Returns:
+        (1): int, the sum value, unit μs.
+        (2): int, total line num.
+    """
+    units_map = {"μs": 1, "ms": 1000}
+    sum_v = 0
+    num_line = 0
     with open(file, "r") as f:
         line = f.readline()
-        col_num = len(line.rstrip("\n").split("\t"))
+        c = line.rstrip("\n").split("\t")
+        print("name = %s" % c[index])
         line = f.readline()
         while line:
             c = line.rstrip("\n").split("\t")
-            key = c[primary_index]
-            if key not in items:
-                items[key] = []
-            value = c[index]
-            items[key].append(extract_prefix_float(value))
-
+            value, unit = extract_value_and_unit(c[index])
+            sum_v += value * units_map[unit]
+            num_line += 1
             line = f.readline()
-
-    items = {k: sum(v) for k, v in items.items()}
-    items = {
-        k: v for k, v in sorted(items.items(), key=lambda item: item[1], reverse=True)
-    }
-    return items
+    return sum_v, num_line
 
 
 def main(args):
-    ns1 = analys_nsys(args.file[0], args.primary_index, args.index)
-    ns2 = analys_nsys(args.file[1], args.primary_index, args.index)
-
-    ns1_sum = 0
-    ns2_sum = 0
-    common_keys = [k for k in ns1.keys() if k in ns2.keys()]
-    for k in common_keys:
-        print("\033[92m" + k + "\033[0m")
-        v1 = ns1[k] if k in ns1 else 0
-        v2 = ns2[k] if k in ns2 else 0
-        print(v1, v2)
-        ns1_sum += v1
-        ns2_sum += v2
-    ns1_keys = [k for k in ns1.keys() if k not in ns2.keys()]
-    for k in ns1_keys:
-        print("\033[93m" + k + "\033[0m")
-        v1 = ns1[k] if k in ns1 else 0
-        v2 = ns2[k] if k in ns2 else 0
-        print(v1, v2)
-        ns1_sum += v1
-        ns2_sum += v2
-    ns2_keys = [k for k in ns2.keys() if k not in ns1.keys()]
-    for k in ns2_keys:
-        print("\033[94m" + k + "\033[0m")
-        v1 = ns1[k] if k in ns1 else 0
-        v2 = ns2[k] if k in ns2 else 0
-        print(v1, v2)
-        ns1_sum += v1
-        ns2_sum += v2
-
-    print(ns1_sum, ns2_sum)
+    sum_v, num_line = analys_nsys(args.file, args.index)
+    print(sum_v, num_line)
+    print(sum_v / num_line)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--file", nargs="+", type=str)
-    parser.add_argument("--primary-index", type=int, required=True)
-    parser.add_argument("--index", type=int, required=True)
+    parser.add_argument("--file", type=str)
+    parser.add_argument("--index", type=int, required=True, help="sum of column[index]")
     args = parser.parse_args()
     main(args)
