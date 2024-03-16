@@ -10,7 +10,7 @@ function rcpus() { top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/
 function rwatch-cpus() { watch -n 1 "top -bn1 | grep \"Cpu(s)\" | sed \"s/.*, *\([0-9.]*\)%* id.*/\1/\" | awk '{print 100 - \$1\"%\"}'"; }
 
 export PS1="(python-3.8) (wxg-gcc-7.5) ${PS1-}"
-
+export TMPDIR=${HOME}/.tmp
 export WNRHOME=/home/wnr
 
 if [ "$VSCODE_GIT_ASKPASS_NODE" != "" ] ; then
@@ -19,7 +19,7 @@ else
     export PATH=
 fi
 export PATH=/usr/local/bin:/usr/bin:${PATH}
-export PATH=/usr/local/cuda/bin:${PATH}
+export PATH=/usr/local/cuda-12.2/bin:${PATH}
 export PATH=${HOME}/.ft:${PATH}
 export PATH=${HOME}/local/bin:${PATH}
 export PATH=${HOME}/local/protobuf/bin:${HOME}/local/patchelf/bin:${HOME}/local/binutils/bin:${PATH}
@@ -31,12 +31,14 @@ export CPATH=${WNRHOME}/local/highwayhash:${WNRHOME}/local/farmhash:${WNRHOME}/l
 export LIBRARY_PATH=
 export LIBRARY_PATH=${WNRHOME}/local/mlas:${LIBRARY_PATH}
 export LD_LIBRARY_PATH=
-export LD_LIBRARY_PATH=/usr/local/lib:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
+export LD_LIBRARY_PATH=/usr/local/lib:/usr/local/cuda-12.2/lib64:${LD_LIBRARY_PATH}
 export LD_LIBRARY_PATH=${HOME}/local/protobuf/lib:${LD_LIBRARY_PATH}
 export LD_LIBRARY_PATH=${WNRHOME}/local/gcc7.5/lib64:${LD_LIBRARY_PATH}
+export LD_LIBRARY_PATH=${WNRHOME}/local/llvm-mlir-16x/lib:${LD_LIBRARY_PATH}
 
 export CMAKE_PREFIX_PATH=
 export CMAKE_PREFIX_PATH=${HOME}/local:${CMAKE_PREFIX_PATH}
+export CMAKE_PREFIX_PATH=/usr/local/cuda-12.2:${CMAKE_PREFIX_PATH}
 export CMAKE_PREFIX_PATH=${WNRHOME}/local/llvm-mlir-16x:${WNRHOME}/local/oneDNN:${CMAKE_PREFIX_PATH}
 export CMAKE_PREFIX_PATH=${WNRHOME}/local/highwayhash:${WNRHOME}/local/farmhash:${WNRHOME}/local/svml:${WNRHOME}/local/mlas:${CMAKE_PREFIX_PATH}
 export CMAKE_PREFIX_PATH=${HOME}/local/protobuf:${CMAKE_PREFIX_PATH}
@@ -48,6 +50,7 @@ export GIT_LFS_SKIP_SMUDGE=1
 export CUDA_VISIBLE_DEVICES=0
 export DNNL_HOME=${WNRHOME}/local/oneDNN
 export VECTORCLASS_HOME=${HOME}/workspace/vectorclass
+export TF_CPP_MIN_LOG_LEVEL="3"
 
 alias code-wnr="code ${HOME}/workspace/wnr"
 alias wnr="${HOME}/workspace/wnr"
