@@ -1,0 +1,8 @@
+build
+build-*
+hello-world
+hello-world*
+hello_world*
+*.so
+*.tar.xz
+__pycache__
