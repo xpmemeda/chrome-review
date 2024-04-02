@@ -1,0 +1,13 @@
+build
+build-*
+hello-world
+hello-world*
+hello_world*
+*.so
+*.tar.xz
+__pycache__
+
+.*
+!.gitignore
+!.vscode
+!.zshrc
