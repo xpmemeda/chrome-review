@@ -4,7 +4,6 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}",
-                "${workspaceFolder}/build",
                 "${HOME}/local/cuda/include",
                 "${HOME}/local/llvm/include",
                 "${HOME}/local/cutlass/include",
@@ -15,7 +14,7 @@
                 "${HOME}/local/pybind11/include"
             ],
             "defines": [],
-            "compilerPath": "${HOME}/local/gcc/bin/gcc"
+            "compilerPath": "${HOME}/local/cuda/bin/nvcc"
         }
     ],
     "version": 4

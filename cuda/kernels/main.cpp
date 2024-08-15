@@ -1,6 +1,7 @@
 #include "pybind11/pybind11.h"
 
 #include "kernels/conv.h"
+#include "kernels/copy.h"
 #include "kernels/gemm.h"
 #include "kernels/softmax.h"
 
@@ -22,6 +23,9 @@ PYBIND11_MODULE(kernels, m) {
   m.def("gemm_v2", &gemm_v2);
 
   m.def("conv_v1", &conv_v1);
+
+  m.def("copy_v1", &copy_v1);
+  m.def("copy_v2", &copy_v2);
 }
 
 }  // namespace cr

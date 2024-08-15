@@ -4,6 +4,8 @@ project(kernels LANGUAGES C CXX CUDA)
 
 set(CMAKE_CXX_STANDARD 17)
 
+# 设置 CUDA 编译选项
+set(CMAKE_CUDA_FLAGS_DEBUG "-G -g -O0")
 
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
 include(FetchContent)
@@ -13,6 +15,14 @@ FetchContent_Declare(
   GIT_TAG v2.11.1
 )
 FetchContent_MakeAvailable(pybind11)
+FetchContent_Declare(
+  cutlass
+  GIT_REPOSITORY https://github.com/NVIDIA/cutlass.git
+  GIT_TAG v3.5.0
+)
+FetchContent_MakeAvailable(cutlass)
+
+
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include(Utils)
 

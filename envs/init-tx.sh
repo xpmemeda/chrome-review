@@ -37,7 +37,7 @@ for path in "${wnr_dep_libs[@]}"; do
 done
 
 export PATH=
-export PATH=/usr/local/bin:/usr/bin:$PATH
+export PATH=/usr/local/bin:/usr/bin:/usr/sbin:$PATH
 export PATH=$CPYTHON_HOME/bin:$CUDA_HOME/bin:$CMAKE_HOME/bin:$GDB_HOME/bin:$GCC_HOME/bin:$PATH
 export PATH=$HOME/.ft:$PATH
 export LD_LIBRARY_PATH=

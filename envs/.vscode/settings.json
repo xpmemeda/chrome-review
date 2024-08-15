@@ -2,7 +2,7 @@
     "editor.formatOnSave": true,
     "python.terminal.activateEnvironment": false,
     "[python]": {
-        "editor.defaultFormatter": "ms-python.black-formatter"
+        "editor.defaultFormatter": "black"
     },
     "[cpp]": {
         "editor.defaultFormatter": "xaver.clang-format"
