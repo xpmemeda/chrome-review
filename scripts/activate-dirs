@@ -1,0 +1,96 @@
+#!/bin/bash
+
+# -n ：字符串 非空（non-zero length）
+# -z ：字符串 为空（zero length）
+
+if [[ "$0" == "$BASH_SOURCE" ]]; then
+    echo "Error: This script must be sourced, not executed."
+    exit 1
+fi
+
+if [[ -z "$_DIR_ENV_ACTIVE" ]]; then
+    export _DIR_ENV_ACTIVE=1
+    export _DIR_OLD_PS1="$PS1"
+    export _DIR_OLD_PATH="$PATH"
+    export _DIR_OLD_LD_LIBRARY_PATH="$LD_LIBRARY_PATH"
+    export _DIR_OLD_LIBRARY_PATH="$LIBRARY_PATH"
+    export _DIR_OLD_CPATH="$CPATH"
+    export _DIR_OLD_CMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH"
+    export _DIR_OLD_CC="$CC"
+    export _DIR_OLD_CXX="$CXX"
+    export _DIR_OLD_CUDA_HOME="$CUDA_HOME"
+fi
+
+
+deactivate() {
+
+    if [[ -n "$_DIR_OLD_PS1" ]]; then PS1="$_DIR_OLD_PS1"; fi
+    if [[ -n "$_DIR_OLD_PATH" ]]; then export PATH="$_DIR_OLD_PATH"; fi
+    if [[ -n "$_DIR_OLD_LD_LIBRARY_PATH" ]]; then export LD_LIBRARY_PATH="$_DIR_OLD_LD_LIBRARY_PATH"; fi
+    if [[ -n "$_DIR_OLD_LIBRARY_PATH" ]]; then export LIBRARY_PATH="$_DIR_OLD_LIBRARY_PATH"; fi
+    if [[ -n "$_DIR_OLD_CPATH" ]]; then export CPATH="$_DIR_OLD_CPATH"; fi
+    if [[ -n "$_DIR_OLD_CMAKE_PREFIX_PATH" ]]; then export CMAKE_PREFIX_PATH="$_DIR_OLD_CMAKE_PREFIX_PATH"; fi
+    if [[ -n "$_DIR_OLD_CC" ]]; then export CC="$_DIR_OLD_CC"; fi
+    if [[ -n "$_DIR_OLD_CXX" ]]; then export CXX="$_DIR_OLD_CXX"; fi
+    if [[ -n "$_DIR_OLD_CUDA_HOME" ]]; then export CUDA_HOME="$_DIR_OLD_CUDA_HOME"; fi
+
+    unset _DIR_OLD_PS1 _DIR_OLD_PATH _DIR_OLD_LD_LIBRARY_PATH _DIR_OLD_LIBRARY_PATH _DIR_OLD_CPATH _DIR_OLD_CC _DIR_OLD_CXX _DIR_OLD_CUDA_HOME _DIR_ENV_ACTIVE
+
+    echo "Environment deactivated."
+}
+
+
+DIRS=()
+
+OPTIND=1
+while getopts "d:" opt; do
+  case $opt in
+    d)
+      DIRS+=("$OPTARG")
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      return 1
+      ;;
+    :)
+      echo "Option -$OPTARG requires an argument." >&2
+      return 1
+      ;;
+  esac
+done
+
+if [[ ${#DIRS[@]} -eq 0 ]]; then
+    echo "Usage: $0 -d <directory> [-d <directory2> ...]"
+    return 1
+fi
+
+for DIR in "${DIRS[@]}"; do
+    export PATH="$DIR/bin:$PATH"
+    export LD_LIBRARY_PATH="$DIR/lib64:$DIR/lib:$LD_LIBRARY_PATH"
+    export LIBRARY_PATH="$DIR/lib64:$DIR/lib:$LIBRARY_PATH"
+    export CPATH="$DIR/include:$CPATH"
+    export CMAKE_PREFIX_PATH="$DIR":$CMAKE_PREFIX_PATH
+done
+
+names=""
+for DIR in "${DIRS[@]}"; do
+    base=$(basename "$DIR")
+    if [[ -z "$names" ]]; then
+        names="$base"
+    else
+        names="$names,$base"
+    fi
+done
+
+export PS1=$'\033[0;33m'"(dir:$names) "$'\033[0m'"${PS1-}"
+
+echo "Environment CC and CXX set to gcc and g++ from PATH."
+export CC=$(which gcc)
+export CXX=$(which g++)
+
+if command -v nvcc >/dev/null 2>&1; then
+    echo "Environment CUDA_HOME set to nvcc from PATH."
+    export CUDA_HOME=$(dirname "$(dirname "$(command -v nvcc)")")
+else
+    echo "nvcc not found in PATH; skipping CUDA_HOME setup."
+fi
