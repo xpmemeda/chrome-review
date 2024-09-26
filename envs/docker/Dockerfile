@@ -121,9 +121,18 @@ RUN cd /workspace &&\
 # Install python3.8
 FROM base_builder AS cpython-3.8.16_builder
 RUN cd /workspace &&\
+    wget https://github.com/openssl/openssl/archive/refs/tags/OpenSSL_1_1_1w.tar.gz &&\
+    tar -xvf OpenSSL_1_1_1w.tar.gz &&\
+    cd openssl-OpenSSL_1_1_1w &&\
+    mkdir build &&\
+    cd build &&\
+    ../config --prefix=/usr/local/openssl-1.1.1w &&\
+    make -j &&\
+    make install
+RUN cd /workspace &&\
     wget https://github.com/python/cpython/archive/refs/tags/v3.8.16.zip &&\
     unzip v3.8.16.zip && cd cpython-3.8.16 &&\
-    ./configure --prefix=/usr/local/python-3.8.16 &&\
+    ./configure --prefix=/usr/local/python-3.8.16 --enable-optimizations --with-openssl=/usr/local/openssl-1.1.1w --with-openssl-rpath=auto &&\
     make -j && make install
 RUN cd /usr/local/python-3.8.16 && ln -s lib lib64 && cd bin && ln -s python3 python
 ENV PATH=/usr/local/python-3.8.16/bin:$PATH

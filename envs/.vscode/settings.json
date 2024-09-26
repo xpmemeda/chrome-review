@@ -100,6 +100,8 @@
         "iostream": "cpp",
         "sstream": "cpp",
         "charconv": "cpp",
-        "__nullptr": "cpp"
+        "__nullptr": "cpp",
+        "queue": "cpp",
+        "stack": "cpp"
     }
 }

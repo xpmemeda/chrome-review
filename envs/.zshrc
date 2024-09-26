@@ -42,3 +42,5 @@ SCRIPT_DIR=$(dirname $(realpath ${HOME}/.zshrc))
 if [ "$SCRIPT_DIR" != "$HOME" ]; then
     source $SCRIPT_DIR/init-tx.sh
 fi
+
+export TMPDIR=$HOME/tmp
