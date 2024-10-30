@@ -1,0 +1,35 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}",
+                "${HOME}/workspace/github/NVTX/c/include",
+                "${HOME}/workspace/github/cutlass/include",
+                "${HOME}/workspace/github/cpython/Include",
+                "${HOME}/workspace/github/ucx/src",
+                "${HOME}/workspace/github/Mooncake/mooncake-transfer-engine/include",
+                "${HOME}/workspace/github/nixl/src/api/cpp",
+                "${HOME}/workspace/github/nixl/src",
+                "${HOME}/workspace/github/json/include",
+                "${HOME}/workspace/github/libzmq/include",
+                "${HOME}/workspace/github/cppzmq",
+                "${HOME}/workspace/github/cpp-httplib",
+                "${HOME}/workspace/github/TensorRT/include",
+                "${HOME}/workspace/github/spdlog",
+                "${HOME}/workspace/github/etcd-cpp-apiv3",
+                "${HOME}/workspace/github/googletest/googletest/include",
+                "${HOME}/workspace/github/pybind11/include",
+                "${HOME}/workspace/github/highfive/include",
+                "${HOME}/local/cpython/lib/python3.10/site-packages/torch/include",
+                "${HOME}/local/cpython/lib/python3.10/site-packages/torch/include/torch/csrc/api/include",
+                "/usr/local/cuda/include"
+            ],
+            "defines": [],
+            "compilerPath": "${HOME}/local/gcc/bin/gcc",
+            "cStandard": "c11",
+            "cppStandard": "c++17"
+        }
+    ],
+    "version": 4
+}

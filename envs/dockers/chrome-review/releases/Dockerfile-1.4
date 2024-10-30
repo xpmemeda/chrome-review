@@ -1,0 +1,101 @@
+FROM centos:8.4.2105 AS s0
+
+# https://serverfault.com/a/1161904
+#   - From first of July 2024 on CentOS 7, please switch to Vault archive repositories
+# https://stackoverflow.com/a/78693402
+RUN sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-* &&\
+    sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
+
+# dnf builddep
+#   - 解析指定软件包的 .spec 文件（通常位于 SRPM 中）。
+#   - 提取构建依赖（BuildRequires 部分）。
+#   - 安装这些依赖包。
+# dnf group install
+#   - 安装指定的软件包组。
+#   - "Development Tools"：软件包组的名称，通常包含编译和开发所需的工具（如 GCC、Make、Git 等）。
+RUN dnf update -y
+RUN dnf install wget bzip2 gcc make which gmp-devel mpfr-devel libmpc-devel git git-lfs dnf-plugins-core pkg-config -y
+# https://devguide.python.org/contrib/workflows/install-dependencies/
+RUN dnf builddep --enablerepo=powertools python3 -y
+RUN dnf group install "Development Tools" -y
+
+RUN mkdir /.docker_workspace
+
+ENV _docker_cmake_version="3.26.3"
+FROM s0 AS cmake_builder
+RUN cd /.docker_workspace \
+    && wget https://github.com/Kitware/CMake/releases/download/v${_docker_cmake_version}/cmake-${_docker_cmake_version}-linux-x86_64.sh \
+    && chmod +x cmake-${_docker_cmake_version}-linux-x86_64.sh && echo "y\ny\n" | ./cmake-${_docker_cmake_version}-linux-x86_64.sh \
+    && ln -s /.docker_workspace/cmake-${_docker_cmake_version}-linux-x86_64/bin/* /usr/local/bin
+
+FROM s0 AS s1
+COPY --from=cmake_builder /.docker_workspace/cmake-${_docker_cmake_version}-linux-x86_64 /usr/local/cmake-${_docker_cmake_version}
+
+ENV CC=/usr/bin/gcc 
+ENV CXX=/usr/bin/g++
+ENV PATH=/usr/local/cmake-${_docker_cmake_version}/bin:$PATH
+
+ENV _docker_cpython_version="3.10.15"
+FROM s1 AS cpython_builder
+RUN cd /.docker_workspace &&\
+    wget https://github.com/openssl/openssl/archive/refs/tags/OpenSSL_1_1_1w.tar.gz &&\
+    tar -xvf OpenSSL_1_1_1w.tar.gz &&\
+    cd openssl-OpenSSL_1_1_1w &&\
+    mkdir build &&\
+    cd build &&\
+    ../config --prefix=/usr/local/openssl-1.1.1w &&\
+    make -j &&\
+    make install
+RUN cd /.docker_workspace &&\
+    wget https://github.com/python/cpython/archive/refs/tags/v${_docker_cpython_version}.zip &&\
+    unzip v${_docker_cpython_version}.zip && cd cpython-${_docker_cpython_version} &&\
+    ./configure --prefix=/usr/local/cpython-${_docker_cpython_version} --enable-optimizations --with-openssl=/usr/local/openssl-1.1.1w --with-openssl-rpath=auto &&\
+    make -j && make install
+RUN cd /usr/local/cpython-${_docker_cpython_version} && ln -s lib lib64 && cd bin && ln -s python3 python
+ENV PATH=/usr/local/cpython-${_docker_cpython_version}/bin:$PATH
+RUN python -m pip install --upgrade pip
+RUN python -m pip install build twine wheel
+RUN python -m pip install vllm
+
+# ctk
+FROM s1 AS ctk_builder
+WORKDIR /.docker_workspace
+RUN wget https://developer.download.nvidia.com/compute/cuda/12.8.0/local_installers/cuda_12.8.0_570.86.10_linux.run
+RUN chmod +x cuda_12.8.0_570.86.10_linux.run && ./cuda_12.8.0_570.86.10_linux.run --silent --toolkit
+
+# openmpi-4.1.6
+FROM s1 AS openmpi_builder
+ENV _docker_openmpi_version="4.1.6" _docker_openmpi_major_version="4" _docker_openmpi_minor_version="1"
+WORKDIR /.docker_workspace
+RUN wget https://download.open-mpi.org/release/open-mpi/v${_docker_openmpi_major_version}.${_docker_openmpi_minor_version}/openmpi-${_docker_openmpi_version}.tar.gz
+RUN tar -xvf openmpi-${_docker_openmpi_version}.tar.gz
+RUN cd openmpi-${_docker_openmpi_version} && ./configure --enable-mpi-cxx --prefix=/usr/local/openmpi-${_docker_openmpi_version}
+RUN cd openmpi-${_docker_openmpi_version} && make -j && make install
+
+FROM s1 AS s2
+COPY --from=cpython_builder /usr/local/openssl-1.1.1w /usr/local/openssl-1.1.1w
+COPY --from=cpython_builder /usr/local/cpython-${_docker_cpython_version} /usr/local/cpython-${_docker_cpython_version}
+COPY --from=ctk_builder /usr/local/cuda-12.8 /usr/local/cuda-12.8
+RUN ln -s /usr/local/cuda-12.8 /usr/local/cuda
+ENV _docker_openmpi_version="4.1.6" _docker_openmpi_major_version="4" _docker_openmpi_minor_version="1"
+COPY --from=openmpi_builder /usr/local/openmpi-${_docker_openmpi_version} /usr/local/openmpi-${_docker_openmpi_version}
+RUN ln -s /usr/local/openmpi-${_docker_openmpi_version} /usr/local/openmpi
+
+ENV PATH=/usr/local/cpython-${_docker_cpython_version}/bin:/usr/local/cuda/bin:$PATH
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+
+# TODO:
+RUN dnf install zsh -y
+RUN yes | sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" && \
+    git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions && \
+    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting && \
+    usermod $(whoami) -s $(which zsh)
+COPY assets/cr.zshrc /root/.zshrc
+RUN sed -i "s|ys|robbyrussell|g" /root/.zshrc
+
+# docker sets.
+RUN mkdir /root/chrome-review
+WORKDIR /root/chrome-review
+SHELL ["/bin/zsh", "-c"]
+ENTRYPOINT []
+CMD sleep infinity

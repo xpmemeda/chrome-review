@@ -1,0 +1,13 @@
+FROM vllm/vllm-openai:v0.7.3 AS S1
+
+ENTRYPOINT []
+WORKDIR /vllm-workspace
+
+RUN python3 -m pip install blinker --ignore-installed && python3 -m pip install quart
+RUN ln -s /llms/Meta-Llama-3.1-8B-Instruct Meta-Llama-3.1-8B-Instruct
+RUN sed -i "s|meta-llama/Meta-Llama-3.1-8B-Instruct|Meta-Llama-3.1-8B-Instruct|g" examples/online_serving/disaggregated_prefill.sh
+
+RUN apt install zip -y
+RUN wget https://github.com/vllm-project/vllm/archive/refs/tags/v0.7.3.zip && unzip v0.7.3.zip
+RUN sed -i "s|meta-llama/Meta-Llama-3.1-8B-Instruct|Meta-Llama-3.1-8B-Instruct|g" vllm-0.7.3/examples/online_serving/disaggregated_prefill.sh
+RUN sed -i "s|../../benchmarks/disagg_benchmarks/disagg_prefill_proxy_server.py|/vllm-workspace/vllm-0.7.3/benchmarks/disagg_benchmarks/disagg_prefill_proxy_server.py|g" vllm-0.7.3/examples/online_serving/disaggregated_prefill.sh
