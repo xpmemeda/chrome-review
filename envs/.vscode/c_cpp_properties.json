@@ -1,0 +1,28 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}",
+                "${workspaceFolder}/build",
+                "${HOME}/local/oneDNN/include",
+                "${HOME}/local/cuda/include",
+                "${HOME}/local/llvm/include",
+                "${HOME}/local/cutlass/include",
+                "${HOME}/local/cpython/include",
+                "${HOME}/local/cpython/include/**",
+                "${HOME}/local/torch/include",
+                "${HOME}/local/torch/include/torch/csrc/api/include",
+                "${HOME}/local/wnr-targets/include",
+                "${HOME}/local/pybind11/include",
+                "${HOME}/local/TensorRT/include",
+                "${HOME}/local/cr"
+            ],
+            "defines": [],
+            "compilerPath": "${HOME}/local/gcc/bin/gcc",
+            "cStandard": "c11",
+            "cppStandard": "c++17"
+        }
+    ],
+    "version": 4
+}
