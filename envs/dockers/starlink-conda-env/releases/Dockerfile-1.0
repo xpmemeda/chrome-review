@@ -1,0 +1,11 @@
+FROM mirrors.tencent.com/tlinux/tlinux4.0 as builder_stage_0
+
+RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+RUN bash Miniconda3-latest-Linux-x86_64.sh -b /root/miniconda3
+ENV PATH=/root/miniconda3/bin:$PATH
+RUN conda init bash
+
+RUN conda create -n conda_ray python=3.9 -y
+RUN bash -c ". activate conda_ray && pip install torch==2.5.1 && pip install vllm==0.6.6.post1 && pip install kazoo"
+
+RUN bash -c "pip install conda-pack && conda pack -n conda_ray"

@@ -1,0 +1,117 @@
+# - 2020年12月，Red Hat 把工作重心从 CentOS Linux 转移到 CentOS Stream ，前者是 RHEL 下游，后者是 RHEL 下游，更好的利用社区力量，最后版本的 CentOS Linux 是 CentOS 8
+# - DockerHub 上面的 centos 账户已经废弃。
+# - CentOS Stream 基础镜像下载链接： https://www.centos.org/
+FROM quay.io/centos/centos:10 AS s0
+
+# dnf builddep
+#   - 解析指定软件包的 .spec 文件（通常位于 SRPM 中）。
+#   - 提取构建依赖（BuildRequires 部分）。
+#   - 安装这些依赖包。
+# dnf group install
+#   - 安装指定的软件包组。
+#   - "Development Tools"：软件包组的名称，通常包含编译和开发所需的工具（如 GCC、Make、Git 等）。
+RUN dnf update -y
+RUN dnf install zsh wget bzip2 gcc make which perl gmp-devel mpfr-devel libmpc-devel git git-lfs dnf-plugins-core pkg-config -y
+RUN dnf builddep --enablerepo=crb python3 -y
+RUN dnf group install "Development Tools" -y
+
+RUN mkdir /.docker_workspace
+
+FROM s0 AS s1
+
+ENV _docker_cmake_version="3.26.3"
+# - 在安装 gcc-10.4.0 时报错 fsconfig_command/mount_attr 重定义，原因是操作系统和 glibc 都提供了这两个结构体，不能同时被 include 。
+#   gcc 源码对此加了隔离： https://github.com/gcc-mirror/gcc/commit/2701442d0cf6292f6624443c15813d6d1a3562fe
+#   在这个 Tag 之后的版本可以正常编译： https://github.com/gcc-mirror/gcc/releases/tag/Thesis
+ENV _docker_gcc_version="10.5.0"
+
+FROM s1 AS cmake_builder
+RUN cd /.docker_workspace \
+    && wget https://github.com/Kitware/CMake/releases/download/v${_docker_cmake_version}/cmake-${_docker_cmake_version}-linux-x86_64.sh \
+    && chmod +x cmake-${_docker_cmake_version}-linux-x86_64.sh && echo "y\ny\n" | ./cmake-${_docker_cmake_version}-linux-x86_64.sh \
+    && ln -s /.docker_workspace/cmake-${_docker_cmake_version}-linux-x86_64/bin/* /usr/local/bin
+
+FROM s1 AS gcc_builder
+WORKDIR /.docker_workspace
+RUN wget https://ftp.gnu.org/gnu/gcc/gcc-$_docker_gcc_version/gcc-$_docker_gcc_version.tar.gz && tar -xzvf gcc-$_docker_gcc_version.tar.gz
+RUN cd gcc-$_docker_gcc_version && mkdir build && cd build && \
+    ../configure --prefix=/usr/local/gcc-$_docker_gcc_version --enable-languages=c,c++ --disable-multilib && \
+    make -j && make install
+
+FROM s1 AS s2
+COPY --from=cmake_builder /.docker_workspace/cmake-${_docker_cmake_version}-linux-x86_64 /usr/local/cmake-${_docker_cmake_version}
+COPY --from=gcc_builder /usr/local/gcc-$_docker_gcc_version /usr/local/gcc-$_docker_gcc_version
+
+ENV CC=/usr/local/gcc-$_docker_gcc_version/bin/gcc
+ENV CXX=/usr/local/gcc-$_docker_gcc_version/bin/g++
+ENV PATH=/usr/local/cmake-${_docker_cmake_version}/bin:/usr/local/gcc-$_docker_gcc_version/bin:$PATH
+ENV LD_LIBRARY_PATH=/usr/local/gcc-$_docker_gcc_version/lib64:/usr/local/gcc-$_docker_gcc_version/lib:$LD_LIBRARY_PATH
+
+ENV _docker_cpython_version="3.10.15"
+ENV _docker_openmpi_version="4.1.6" _docker_openmpi_major_version="4" _docker_openmpi_minor_version="1"
+
+FROM s2 AS cpython_builder
+RUN cd /.docker_workspace && \
+    wget https://github.com/openssl/openssl/archive/refs/tags/OpenSSL_1_1_1w.tar.gz && \
+    tar -xvf OpenSSL_1_1_1w.tar.gz && \
+    cd openssl-OpenSSL_1_1_1w && mkdir build && cd build && \
+    ../config --prefix=/usr/local/openssl-1.1.1w && \
+    make -j && make install
+RUN cd /.docker_workspace && \
+    wget https://github.com/python/cpython/archive/refs/tags/v${_docker_cpython_version}.zip && \
+    unzip v${_docker_cpython_version}.zip
+RUN cd /.docker_workspace && \
+    cd cpython-${_docker_cpython_version} && mkdir build_shared && cd build_shared && \
+    ../configure --prefix=/usr/local/cpython-${_docker_cpython_version} --enable-shared --enable-optimizations --with-openssl=/usr/local/openssl-1.1.1w --with-openssl-rpath=auto && \
+    make -j && make install
+RUN cd /.docker_workspace && \
+    cd cpython-${_docker_cpython_version} && mkdir build_static && cd build_static && \
+    ../configure --prefix=/usr/local/cpython-${_docker_cpython_version} --enable-optimizations --with-openssl=/usr/local/openssl-1.1.1w --with-openssl-rpath=auto && \
+    make -j && make install
+RUN cd /usr/local/cpython-${_docker_cpython_version} && ln -s lib lib64 && cd bin && ln -s python3 python
+
+# ctk
+FROM s2 AS ctk_builder
+WORKDIR /.docker_workspace
+RUN wget https://developer.download.nvidia.com/compute/cuda/12.8.0/local_installers/cuda_12.8.0_570.86.10_linux.run
+RUN chmod +x cuda_12.8.0_570.86.10_linux.run && ./cuda_12.8.0_570.86.10_linux.run --silent --toolkit
+
+# openmpi-4.1.6
+FROM s2 AS openmpi_builder
+WORKDIR /.docker_workspace
+RUN wget https://download.open-mpi.org/release/open-mpi/v${_docker_openmpi_major_version}.${_docker_openmpi_minor_version}/openmpi-${_docker_openmpi_version}.tar.gz
+RUN tar -xvf openmpi-${_docker_openmpi_version}.tar.gz
+RUN cd openmpi-${_docker_openmpi_version} && ./configure --enable-mpi-cxx --prefix=/usr/local/openmpi-${_docker_openmpi_version}
+RUN cd openmpi-${_docker_openmpi_version} && make -j && make install
+
+FROM s2 AS s3
+COPY --from=cpython_builder /usr/local/openssl-1.1.1w /usr/local/openssl-1.1.1w
+COPY --from=cpython_builder /usr/local/cpython-${_docker_cpython_version} /usr/local/cpython-${_docker_cpython_version}
+COPY --from=ctk_builder /usr/local/cuda-12.8 /usr/local/cuda-12.8
+RUN ln -s /usr/local/cuda-12.8 /usr/local/cuda
+COPY --from=openmpi_builder /usr/local/openmpi-${_docker_openmpi_version} /usr/local/openmpi-${_docker_openmpi_version}
+RUN ln -s /usr/local/openmpi-${_docker_openmpi_version} /usr/local/openmpi
+
+ENV PATH=/usr/local/cpython-${_docker_cpython_version}/bin:/usr/local/cuda/bin:$PATH
+ENV LD_LIBRARY_PATH=/usr/local/cpython-$_docker_cpython_version/lib:/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+
+RUN yes | sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" && \
+    git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions && \
+    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting && \
+    usermod $(whoami) -s $(which zsh)
+COPY assets/cr.zshrc /root/.zshrc
+RUN sed -i "s|ys|robbyrussell|g" /root/.zshrc
+
+# docker sets.
+RUN mkdir /root/chrome-review
+WORKDIR /root/chrome-review
+SHELL ["/bin/zsh", "-c"]
+ENTRYPOINT []
+CMD sleep infinity
+
+# TODO:
+#   - CentOS 10 自带的 GCC 版本是 14.x ，比前面自己装的 10.5 要高，一些应用程序可能会以来更高版本的 GCC 库。
+#   - 对老的库的兼容。
+ENV LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
+RUN dnf install libxcrypt-compat-4.4.36-9.el10.x86_64 -y
+RUN dnf install vim -y

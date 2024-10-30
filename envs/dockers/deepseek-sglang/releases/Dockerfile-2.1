@@ -1,0 +1,89 @@
+FROM lmsysorg/sglang:v0.4.3.post2-cu125-srt AS builder_stage_0
+
+RUN apt update && apt install tmux netcat -y
+
+# NCCL_IB_GID_INDEX=3
+# - 含义：指定 InfiniBand 的 GID (Global Identifier) 索引。
+# - 作用：在多网卡或多路径环境中，选择特定的 InfiniBand 接口进行通信。GID 索引用于标识不同的 InfiniBand 网络路径。
+# - 默认值：通常为 0。
+# - 适用场景：当主机有多个 InfiniBand 网卡或路径时，可以通过该变量指定使用哪条路径。
+# NCCL_IB_SL=3
+# - 含义：指定 InfiniBand 的 SL (Service Level)。
+# - 作用：SL 是 InfiniBand 网络中的服务质量（QoS）参数，用于控制数据包的优先级和路由。
+# - 默认值：通常为 0。
+# - 适用场景：在复杂的网络环境中，调整 SL 可以优化通信性能或避免网络拥塞。
+# NCCL_CHECK_DISABLE=1
+# - 含义：禁用 NCCL 的检查机制。
+# - 作用：NCCL 默认会检查通信参数和硬件配置是否合理。禁用检查可以跳过这些验证步骤，减少启动时间。
+# - 默认值：0（启用检查）。
+# - 适用场景：在已知配置正确的情况下，禁用检查可以加速 NCCL 初始化。
+# NCCL_P2P_DISABLE=0
+# - 含义：启用或禁用 NCCL 的 P2P (Peer-to-Peer) 通信。
+# - 作用：P2P 通信允许 GPU 之间直接传输数据，绕过 CPU 和系统内存，从而提高通信效率。
+# - 默认值：0（启用 P2P）。
+# - 适用场景：在支持 P2P 的硬件环境中，启用 P2P 可以显著提升性能。
+# NCCL_IB_DISABLE=0
+# - 含义：启用或禁用 InfiniBand 支持。
+# - 作用：NCCL 默认会尝试使用 InfiniBand 进行高速通信。禁用 InfiniBand 后，NCCL 会回退到其他通信方式（如 TCP）。
+# - 默认值：0（启用 InfiniBand）。
+# - 适用场景：在 InfiniBand 不可用或不稳定的环境中，可以禁用 InfiniBand。
+# NCCL_LL_THRESHOLD=16384
+# - 含义：设置低延迟（Low Latency）通信的阈值。
+# - 作用：NCCL 会根据消息大小选择不同的通信协议。对于小于该阈值的消息，NCCL 会使用低延迟协议；对于大于该阈值的消息，NCCL 会使用高带宽协议。
+# - 默认值：通常为 16384（16 KB）。
+# - 适用场景：根据网络和硬件特性调整阈值，可以优化通信性能。
+# NCCL_IB_CUDA_SUPPORT=1
+# - 含义：启用或禁用 InfiniBand 对 CUDA 的支持。
+# - 作用：启用后，NCCL 会使用 InfiniBand 的 GPU Direct RDMA 技术，允许 GPU 直接通过 InfiniBand 网络通信，减少 CPU 和内存的参与。
+# - 默认值：1（启用）。
+# - 适用场景：在支持 GPU Direct RDMA 的硬件环境中，启用该选项可以显著提升性能。
+ENV NCCL_IB_GID_INDEX=3 NCCL_IB_SL=3 NCCL_CHECK_DISABLE=1 NCCL_P2P_DISABLE=0 NCCL_IB_DISABLE=0 NCCL_LL_THRESHOLD=16384 NCCL_IB_CUDA_SUPPORT=1
+
+# NCCL_SOCKET_IFNAME=bond1
+# - 含义：指定 NCCL 使用的网络接口。
+# - 作用：在多网卡环境中，强制 NCCL 使用指定的网络接口（如 bond1）进行通信。
+# - 适用场景：当主机有多个网络接口（如以太网、InfiniBand）时，可以通过该变量指定 NCCL 使用的接口，避免使用不合适的接口导致性能下降。
+# UCX_NET_DEVICES=bond1
+# - 含义：指定 UCX 使用的网络设备。
+# - 作用：UCX 是一个高性能通信库，常用于加速分布式计算。该变量强制 UCX 使用指定的网络设备（如 bond1）进行通信。
+# - 适用场景：在复杂的网络环境中，指定 UCX 使用的网络设备可以避免性能问题或通信错误。
+# NCCL_IB_HCA=mlx5_bond_1,mlx5_bond_5,mlx5_bond_3,mlx5_bond_7,mlx5_bond_4,mlx5_bond_8,mlx5_bond_2,mlx5_bond_6
+# - 含义：指定 NCCL 使用的 InfiniBand 主机通道适配器（HCA）。
+# - 作用：NCCL 默认会尝试使用所有可用的 InfiniBand HCA 进行通信。通过该变量可以限制 NCCL 使用的 HCA 列表，避免使用不合适的 HCA。
+# - 适用场景：在有多块 InfiniBand 网卡的环境中，指定特定的 HCA 可以优化通信性能或避免硬件冲突。
+ENV NCCL_SOCKET_IFNAME=bond1 UCX_NET_DEVICES=bond1 NCCL_IB_HCA=mlx5_bond_1,mlx5_bond_5,mlx5_bond_3,mlx5_bond_7,mlx5_bond_4,mlx5_bond_8,mlx5_bond_2,mlx5_bond_6
+
+# NCCL_COLLNET_ENABLE=0
+# - 含义：启用或禁用 NCCL 的 CollNet 功能。
+# - 作用：CollNet 是 NCCL 的一种优化技术，利用 NVIDIA 的 SHARP (Scalable Hierarchical Aggregation and Reduction Protocol) 加速集合通信操作（如 AllReduce、AllGather 等）。禁用 CollNet 后，NCCL 会使用传统的通信方式。
+# - 默认值：1（启用 CollNet）。
+# - 适用场景：在 CollNet 不可用或不稳定的环境中，可以禁用 CollNet。
+# SHARP_COLL_ENABLE_SAT=0
+# - 含义：启用或禁用 SHARP 的 SAT (Scalable Aggregation Tree) 功能。
+# - 作用：SAT 是 SHARP 的一种优化技术，用于加速集合通信操作。禁用 SAT 后，SHARP 会使用其他通信方式。
+# - 默认值：1（启用 SAT）。
+# - 适用场景：在 SAT 不可用或不稳定的环境中，可以禁用 SAT。
+# NCCL_NET_GDR_LEVEL=2
+# - 含义：设置 GPU Direct RDMA (GDR) 的级别。
+# - 作用：GDR 允许 GPU 直接通过网络传输数据，绕过 CPU 和系统内存，从而提高通信效率。该变量控制 GDR 的使用级别：
+#   0：禁用 GDR。
+#   1：启用 GDR，但仅在支持的情况下使用。
+#   2：强制使用 GDR，即使在不完全支持的环境中。
+# - 默认值：1。
+# - 适用场景：在支持 GDR 的硬件环境中，启用 GDR 可以显著提升性能。
+# NCCL_IB_QPS_PER_CONNECTION=4
+# - 含义：设置每个 InfiniBand 连接的 QP (Queue Pair) 数量。
+# - 作用：QP 是 InfiniBand 通信的基本单位，增加 QP 数量可以提高通信的并发性和吞吐量。
+# - 默认值：通常为 1。
+# - 适用场景：在高并发或高吞吐量的环境中，增加 QP 数量可以优化性能。
+# NCCL_IB_TC=160
+# - 含义：设置 InfiniBand 的流量类别（Traffic Class）。
+# - 作用：流量类别用于控制 InfiniBand 网络中的数据包优先级和路由。不同的流量类别可以用于优化网络性能或避免拥塞。
+# - 默认值：通常为 0。
+# - 适用场景：在复杂的网络环境中，调整流量类别可以优化通信性能。
+# NCCL_PXN_DISABLE=0
+# - 含义：启用或禁用 PXN (PCIe Cross Node) 功能。
+# - 作用：PXN 是一种优化技术，允许跨节点的 GPU 通过 PCIe 交换机直接通信，减少网络延迟。禁用 PXN 后，NCCL 会使用传统的网络通信方式。
+# - 默认值：0（启用 PXN）。
+# - 适用场景：在 PXN 不可用或不稳定的环境中，可以禁用 PXN。
+ENV NCCL_COLLNET_ENABLE=0 SHARP_COLL_ENABLE_SAT=0 NCCL_NET_GDR_LEVEL=2 NCCL_IB_QPS_PER_CONNECTION=4 NCCL_IB_TC=160 NCCL_PXN_DISABLE=0

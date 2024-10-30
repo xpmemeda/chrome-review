@@ -1,0 +1,9 @@
+FROM lmsysorg/sglang:v0.4.3.post2-cu125-srt AS S1
+
+RUN python3 -m pip install blinker --ignore-installed && python3 -m pip install quart
+RUN ln -s /usr/bin/python3 /usr/bin/python
+
+RUN python3 -m pip install redis
+
+ENTRYPOINT []
+WORKDIR /sgl-workspace
