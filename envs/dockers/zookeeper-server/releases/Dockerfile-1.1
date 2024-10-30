@@ -1,0 +1,3 @@
+FROM zookeeper:3.9.3-jre-17 AS zk_builder
+
+RUN cp /conf/zoo_sample.cfg /conf/zoo.cfg && echo "admin.serverPort=8081" >> /conf/zoo.cfg
