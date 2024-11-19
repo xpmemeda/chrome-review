@@ -1,0 +1,6 @@
+# This file must be used with "source activate" *from bash*
+# you cannot run it directly
+
+source ${HOME}/envs/vllm/bin/activate
+python_version=$(python -c "import sys; print('.'.join(map(str, sys.version_info[:2])))" 2>/dev/null)
+export LD_LIBRARY_PATH=${HOME}/envs/vllm/lib/python${python_version}/site-packages/nvidia/nvjitlink/lib:$LD_LIBRARY_PATH
