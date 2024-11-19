@@ -1,0 +1,13 @@
+VLLM_HOME=${HOME}/envs/vllm
+
+if [ ! -d ${VLLM_HOME} ]; then
+    python -m venv ${VLLM_HOME}
+    source ${VLLM_HOME}/bin/activate
+    python -m pip install vllm==0.6.4post1
+    python -m pip install packaging wonderwords GPUtil
+else
+    source ${HOME}/envs/vllm/bin/activate
+fi
+
+python_version=$(python -c "import sys; print('.'.join(map(str, sys.version_info[:2])))" 2>/dev/null)
+export LD_LIBRARY_PATH=${HOME}/envs/vllm/lib/python${python_version}/site-packages/nvidia/nvjitlink/lib:$LD_LIBRARY_PATH

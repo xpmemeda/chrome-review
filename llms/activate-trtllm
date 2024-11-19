@@ -1,0 +1,16 @@
+TRTLLM_HOME=${HOME}/envs/trtllm
+
+if [ ! -d ${TRTLLM_HOME} ]; then
+    python -m venv ${TRTLLM_HOME}
+    source ${TRTLLM_HOME}/bin/activate
+    python -m pip install packaging wonderwords GPUtil
+    python -m pip install xformers==0.0.27post2 triton==3.0.0 torch==2.4.0 torchvision==0.19.0 pynvml==11.5.0
+    python -m pip install tensorrt_llm==0.14.0
+else
+    source ${TRTLLM_HOME}/bin/activate
+fi
+
+python_version=$(python -c "import sys; print('.'.join(map(str, sys.version_info[:3])))" 2>/dev/null)
+export LD_LIBRARY_PATH=~/local/cpython-${python_version}/lib:$LD_LIBRARY_PATH
+python_version=$(python -c "import sys; print('.'.join(map(str, sys.version_info[:2])))" 2>/dev/null)
+export LD_LIBRARY_PATH=~/envs/trtllm/lib/python${python_version}/site-packages/nvidia/nvjitlink/lib:$LD_LIBRARY_PATH
