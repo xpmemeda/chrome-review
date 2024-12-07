@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package cr;
+
+message Cr {
+    string string = 1;
+    bytes bytes = 2;
+    int64 int64 = 3;
+}
