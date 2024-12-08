@@ -2,7 +2,9 @@
 
 #include <cstdint>
 
-#include "cuda_fp16.h"
+#include <cooperative_groups/memcpy_async.h>
+#include <cuda_fp16.h>
+#include <cuda/pipeline>
 
 #include "./attention_dtypes.h"
 #include "./attention_generic.cuh"
@@ -598,6 +600,177 @@ struct LoadQAndGemmQk_CR3 {
   const int lane;
 
   scalar_t q_vec[N];
+};
+
+template <class scalar_t, int HEAD_SIZE, int BLOCK_SIZE, int NUM_THREADS>
+struct LoadQAndGemmQk_CR4 {
+  static constexpr int NUM_WARPS = NUM_THREADS / WARP_SIZE;
+  static constexpr int N = HEAD_SIZE / WARP_SIZE;
+  static constexpr int NUM_STAGES = 8;
+  using vec_t = typename Vec<scalar_t, N>::Type;
+
+  inline __device__ LoadQAndGemmQk_CR4(const scalar_t* q, vec_t* smem_k_vecs, const scalar_t* k_cache,
+      const int32_t* block_table, float* logits, float* red_smem, const int seq_idx, const int head_idx,
+      const int kv_head_idx, const int q_stride, const int kv_block_stride, const int kv_head_stride,
+      const int context_len, const int num_blocks, const float scale, const float alibi_slope, const int kv_offset = 0)
+      : q(q),
+        k_vecs(reinterpret_cast<decltype(k_vecs)>(*smem_k_vecs)),
+        k_cache(k_cache),
+        block_table(block_table),
+        logits(logits),
+        red_smem(red_smem),
+        seq_idx(seq_idx),
+        head_idx(head_idx),
+        kv_head_idx(kv_head_idx),
+        q_stride(q_stride),
+        kv_block_stride(kv_block_stride),
+        kv_head_stride(kv_head_stride),
+        context_len(context_len),
+        num_blocks(num_blocks),
+        scale(scale),
+        alibi_slope(alibi_slope),
+        kv_offset(kv_offset),
+        thread_idx(threadIdx.x),
+        warp_idx(thread_idx / WARP_SIZE),
+        lane(thread_idx % WARP_SIZE) {}
+
+  inline __device__ void loadQ() {
+    const scalar_t* q_ptr = q + seq_idx * q_stride + head_idx * HEAD_SIZE;
+    // NOTE: Here we compare 2 methods: 1. All threads load data to registers and no sync.
+    //                                  2. Warp 0 load data to shared memory and then sync to all threads.
+    //       The former increases the access to global memory, and the latter adds a thread synchronization overhead.
+    //       Experiments show that the former is faster.
+    q_vec = *reinterpret_cast<const vec_t*>(q_ptr + lane * N);
+  }
+
+  inline __device__ float gemmQk() {
+    cuda::pipeline<cuda::thread_scope_thread> pipeline = cuda::make_pipeline();
+
+    float qk_max = -FLT_MAX;
+    float qk[BLOCK_SIZE];
+
+    if (warp_idx < num_blocks) {
+      const int physical_block_number = block_table[warp_idx];
+      const vec_t* k_base_ptr = reinterpret_cast<const vec_t*>(
+          k_cache + physical_block_number * kv_block_stride + kv_head_idx * kv_head_stride);
+#pragma unroll
+      for (int i = 0; i < NUM_STAGES - 1; ++i) {
+        pipeline.producer_acquire();
+        cuda::memcpy_async(
+            &k_vecs[NUM_STAGES * warp_idx + i][lane], k_base_ptr + i * WARP_SIZE + lane, sizeof(vec_t), pipeline);
+        pipeline.producer_commit();
+      }
+    }
+
+    for (int block_idx = warp_idx; block_idx < num_blocks; block_idx += NUM_WARPS) {
+      const int physical_block_number = block_table[block_idx];
+      const vec_t* k_base_ptr = reinterpret_cast<const vec_t*>(
+          k_cache + physical_block_number * kv_block_stride + kv_head_idx * kv_head_stride);
+
+#pragma unroll
+      for (int physical_block_offset = NUM_STAGES - 1; physical_block_offset < BLOCK_SIZE; ++physical_block_offset) {
+        const vec_t* k_ptr = k_base_ptr + physical_block_offset * WARP_SIZE;
+
+        const int copy_stage_idx = physical_block_offset % NUM_STAGES;
+        pipeline.producer_acquire();
+        cuda::memcpy_async(
+            &k_vecs[NUM_STAGES * warp_idx + copy_stage_idx][lane], k_ptr + lane, sizeof(vec_t), pipeline);
+        pipeline.producer_commit();
+
+        const int load_stage_idx = (physical_block_offset + 1) % NUM_STAGES;
+        pipeline.consumer_wait();
+        vec_t k_vec = k_vecs[NUM_STAGES * warp_idx + load_stage_idx][lane];
+        pipeline.consumer_release();
+
+        using A_vec = typename FloatVec<vec_t>::Type;
+        A_vec qk_vec = mul<A_vec, vec_t, vec_t>(q_vec, k_vec);
+        qk[physical_block_offset - NUM_STAGES + 1] = sum(qk_vec);
+      }
+
+      const vec_t* next_k_base_ptr = nullptr;
+      if (block_idx + NUM_WARPS < num_blocks) {
+        const int next_physical_block_number = block_table[block_idx + NUM_WARPS];
+        next_k_base_ptr = reinterpret_cast<const vec_t*>(
+            k_cache + next_physical_block_number * kv_block_stride + kv_head_idx * kv_head_stride);
+      }
+
+#pragma unroll
+      for (int i = 0; i < NUM_STAGES - 1; ++i) {
+        if (next_k_base_ptr) {
+          pipeline.producer_acquire();
+          cuda::memcpy_async(&k_vecs[NUM_STAGES * warp_idx + i][lane], next_k_base_ptr + i * WARP_SIZE + lane,
+              sizeof(vec_t), pipeline);
+          pipeline.producer_commit();
+        }
+
+        const int physical_block_offset = BLOCK_SIZE + i;
+
+        const int load_stage_idx = (physical_block_offset + 1) % NUM_STAGES;
+        pipeline.consumer_wait();
+        vec_t k_vec = k_vecs[NUM_STAGES * warp_idx + load_stage_idx][lane];
+        pipeline.consumer_release();
+
+        using A_vec = typename FloatVec<vec_t>::Type;
+        A_vec qk_vec = mul<A_vec, vec_t, vec_t>(q_vec, k_vec);
+        qk[physical_block_offset - NUM_STAGES + 1] = sum(qk_vec);
+      }
+
+#pragma unroll
+      for (int physical_block_offset = 0; physical_block_offset < BLOCK_SIZE; ++physical_block_offset) {
+        // NOTE: We handle this loop independently because __shfl will cause an extra synchronization of threads within
+        //       the warp.
+        float token_qk = qk[physical_block_offset];
+#pragma unroll
+        for (int mask = WARP_SIZE / 2; mask >= 1; mask /= 2) {
+          token_qk += __shfl_xor_sync(uint32_t(-1), token_qk, mask);
+        }
+        qk[physical_block_offset] = token_qk;
+      }
+
+      if (lane < BLOCK_SIZE) {
+        const int token_idx = block_idx * BLOCK_SIZE + lane;
+        float qk_ = qk[lane];
+        // NOTE: Each element add a constant value before softmax will not change the result.
+        // qk_ += alibi_slope != 0 ? alibi_slope * (token_idx - context_len + 1) : 0;
+        qk_ += alibi_slope * (token_idx + kv_offset);
+        qk_ *= scale;
+        qk_ = token_idx < context_len ? qk_ : -FLT_MAX;
+        logits[token_idx] = qk_;
+        qk_max = fmaxf(qk_max, qk_);
+      }
+    }
+    // NOTE: qk_max only impact the accuracy of softmax, it will not change the result theoretically.
+    // NOTE: The accuracy of CUDA's exp is lower than normal c++ source file, so we should always sub the max value
+    //       before softmax.
+    qk_max = Reduce::reduce<Reduce::Max, float, NUM_WARPS>(red_smem, qk_max);
+    return qk_max;
+  }
+
+  const scalar_t* q;
+  const scalar_t* k_cache;
+  const int32_t* block_table;
+  float* logits;
+  float* red_smem;
+
+  const int seq_idx;
+  const int head_idx;
+  const int kv_head_idx;
+  const int q_stride;
+  const int kv_block_stride;
+  const int kv_head_stride;
+  const int context_len;
+  const int num_blocks;
+
+  const float scale;
+  const float alibi_slope;
+  const int kv_offset;
+
+  const int thread_idx;
+  const int warp_idx;
+  const int lane;
+
+  vec_t q_vec;
+  vec_t (&k_vecs)[NUM_STAGES * NUM_WARPS][WARP_SIZE];
 };
 
 template <class scalar_t, int HEAD_SIZE, int BLOCK_SIZE, int NUM_THREADS>
