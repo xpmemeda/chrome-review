@@ -6,11 +6,11 @@ import vllm
 from transformers import AutoTokenizer
 
 
-def get_prompts(num_prompts, input_len, tokenizer):
+def get_prompts(num_prompts, prefix_hit_len, input_len, tokenizer):
     random_words = wonderwords.RandomWord().random_words(num_prompts)
     prompts = []
     for random_word in random_words:
-        random_word += " hihihi"
+        random_word = "hi" * prefix_hit_len + " " + random_word + " hihihi"
         num_word_tokens = len(tokenizer.encode(random_word))
         prompt = random_word + "hi" * (input_len - num_word_tokens)
         x = len(tokenizer.encode(prompt))
@@ -21,8 +21,9 @@ def get_prompts(num_prompts, input_len, tokenizer):
 
 
 def main(args: argparse.Namespace):
+    print(args)
     tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
-    prompts = get_prompts(args.num_prompts, args.input_len, tokenizer)
+    prompts = get_prompts(args.num_prompts, args.prefix_hit_len, args.input_len, tokenizer)
 
     llm_kwargs = {
         "model": args.model,
@@ -30,6 +31,8 @@ def main(args: argparse.Namespace):
         "trust_remote_code": True,
         "gpu_memory_utilization": 0.9,
         "max_num_seqs": args.batch_size,
+        "enforce_eager": True,
+        "enable_prefix_caching": args.enable_prefix_caching
     }
     sampling_kwargs = {
         "temperature": 0.5,
@@ -38,7 +41,7 @@ def main(args: argparse.Namespace):
         "min_tokens": args.output_len,
         "max_tokens": args.output_len,
     }
-    llm_kwargs.update({"enforce_eager": True})
+
 
     llm_engine = vllm.LLM(**llm_kwargs)
     sampling_params = vllm.SamplingParams(**sampling_kwargs)
@@ -70,10 +73,12 @@ def main(args: argparse.Namespace):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Benchmark the throughput.")
     parser.add_argument("--model", type=str, required=True)
-    parser.add_argument("--input-len", type=int, default=1024)
-    parser.add_argument("--output-len", type=int, default=16)
     parser.add_argument("--num-prompts", type=int, default=256)
     parser.add_argument("--batch-size", type=int, default=16)
+    parser.add_argument("--input-len", type=int, default=1024)
+    parser.add_argument("--output-len", type=int, default=16)
+    parser.add_argument("--enable-prefix-caching", action="store_true")
+    parser.add_argument("--prefix-hit-len", type=int, default=0)
     args = parser.parse_args()
 
     main(args)
