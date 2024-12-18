@@ -5,24 +5,29 @@
 - FP16: FP16 TFLOPS(Tensor Core)
 - INT8: INT8 TOPS(Tensor Core)
 - CUDA: CUDA cores
-- TENSOR: Tensor cores
+- TMUs: Tensor cores
 - L1/Smem: KB/SM
 - Gmem: GB
-- Gmem BW:  GB/s
+- Gmem BW: GB/s
 - TDP: Thermal Design Power (W)
 
-Ref: https://en.wikipedia.org/wiki/List_of_Nvidia_graphics_processing_units
 
-- 8.9: SM(128, 4, 128KB)
+|GPU            |Arch       |Launch |Core   |CC     |F32    |TF32   |F16    |I8     |SM     |CUDA   |TMUs   |L1 (K) |L2 (M) |Gmem (GB)  |Gmem BW (GB/s) |TDP    |
+|-              |-          |-      |-      |-      |-      |-      |-      |-      |-      |-      |-      |-      |-      |-          |-              |-      |
+|T4             |Turing     |18/09  |TU104  |7.5    |8.1    |       |65     |130    |40     |2560   |160    |64     |4      |16 GDDR6   |320            |70     |
+|A10            |Ampere     |21/04  |GA102  |8.6    |31.2   |62.5   |125    |250    |72     |9216   |288    |128    |6      |24 GDDR6   |600            |150    |
+|A100 40G PCIe  |Ampere     |20/06  |GA100  |8.0    |19.5   |156    |312    |624    |108    |6912   |432    |192    |40     |40 HBM2e   |1560           |300    |
+|A100 80G PCIe  |Ampere     |21/06  |GA100  |8.0    |19.5   |156    |312    |624    |108    |6912   |432    |192    |80     |80 HBM2e   |1935           |300    |
+|L20            |Lovelace   |23/11  |AD102  |8.9    |59.8   |       |119.5  |239    |92     |11776  |368    |128    |96     |48 GDDR6   |864            |275    |
+|L40            |Lovelace   |22/10  |AD102  |8.9    |90.5   |90.5   |181    |362    |142    |18176  |568    |128    |96     |48 GDDR6   |864            |300    |
+|RTX 4090       |Lovelace   |22/10  |AD102  |8.9    |83.8   |       |167.6  |330    |128    |16384  |512    |128    |72     |24 GDDR6X  |1008           |450    |
+|H100 PCIe      |Hopper     |23/03  |GH100  |9.0    |60     |-      |835    |-      |114    |14592  |456    |256    |50     |94 HBM2e   |3900           |400    |
+|H100 SXM       |Hopper     |23/03  |GH100  |9.0    |67     |-      |989    |-      |114    |14592  |456    |256    |50     |80 HBM2e   |3350           |700    |
 
-|GPU        |Arch       |Launch |Core       |CC     |F32    |F16    |I8     |SM     |CUDA   |TENSOR |L1/SMem|Gmem       |Gmem BW    |TDP    |
-|-          |-          |-      |-          |-      |-      |-      |-      |-      |-      |-      |-      |-          |-          |-      |
-|T4         |Turing     |18.09  |TU104      |7.5    |8.1    |65     |130    |40     |2560   |320    |64     |16         |300        |70     |
-|A10        |Ampere     |21.04  |GA102      |8.6    |31.2   |125    |250    |72     |9216   |288    |64     |24 GDDR6   |600        |150    |
-|A100       |Ampere     |20.05  |GA100      |8.0    |19.5   |312    |624    |108    |6912   |432    |164    |40/80 HBM2e|1935       |300    |
-|L20        |Lovelace   |       |           |8.9    |59.8   |119.5  |239    |92     |11776  |368    |100    |48         |864        |?      |
-|L40        |Lovelace   |22.10  |AD102      |8.9    |90.5   |181    |362    |142    |18176  |568    |128    |48 GDDR6   |864        |300    |
-|RTX 4090   |Lovelace   |22.10  |AD102-300  |8.9    |83.8   |167.6  |1330   |128    |16384  |512    |128    |24 GDDR6X  |1008       |450    |
+Refs:
+
+- https://en.wikipedia.org/wiki/List_of_Nvidia_graphics_processing_units
+- https://www.techpowerup.com/
 
 ## What's the CUDA primary context
 
