@@ -1,19 +1,28 @@
 # 常见卡的规格对比
 
-|Entry                          |T4     |A10(PCIe)  |A100(PCIe) |L40        |RTX 4090   |
-|-                              |-      |-          |-          |-          |-          |
-|Arch                           |Turing |Ampere     |Ampere     |Lovelace   |Lovelace   |
-|Compute capability             |7.5    |8.6        |8.0        |8.9        |8.9        |
-|FP32 TFLOPS(CUDA Core)         |8.1    |31.2       |19.5       |90.5       |83.8       |
-|FP16 TFLOPS(Tensor Core)       |65     |125        |312        |181        |167.6      |
-|INT8 TOPS(Tensor Core)         |130    |250        |624        |362        |1330       |
-|SM                             |40     |72         |108        |142        |128        |
-|CUDA Cores                     |2560   |9216       |6912       |18176      |16384      |
-|Tensor Cores                   |320    |288        |432        |568        |512        |
-|L1/shared memory(KB/SM)        |64     |64         |164        |128        |128        |
-|GPU memory(GiB)                |16     |24         |40/80      |48         |24         |
-|GPU memory bandwidth(GiB/s)    |300    |600        |1935       |864        |1008       |
-|TDP(Thermal Design Power)(W)   |70     |150        |300        |300        |450        |
+- CC: Compute capability
+- FP32: FP32 TFLOPS(CUDA Core)
+- FP16: FP16 TFLOPS(Tensor Core)
+- INT8: INT8 TOPS(Tensor Core)
+- CUDA: CUDA cores
+- TENSOR: Tensor cores
+- L1/Smem: KB/SM
+- Gmem: GB
+- Gmem BW:  GB/s
+- TDP: Thermal Design Power (W)
+
+Ref: https://en.wikipedia.org/wiki/List_of_Nvidia_graphics_processing_units
+
+- 8.9: SM(128, 4, 128KB)
+
+|GPU        |Arch       |Launch |Core       |CC     |F32    |F16    |I8     |SM     |CUDA   |TENSOR |L1/SMem|Gmem       |Gmem BW    |TDP    |
+|-          |-          |-      |-          |-      |-      |-      |-      |-      |-      |-      |-      |-          |-          |-      |
+|T4         |Turing     |18.09  |TU104      |7.5    |8.1    |65     |130    |40     |2560   |320    |64     |16         |300        |70     |
+|A10        |Ampere     |21.04  |GA102      |8.6    |31.2   |125    |250    |72     |9216   |288    |64     |24 GDDR6   |600        |150    |
+|A100       |Ampere     |20.05  |GA100      |8.0    |19.5   |312    |624    |108    |6912   |432    |164    |40/80 HBM2e|1935       |300    |
+|L20        |Lovelace   |       |           |8.9    |59.8   |119.5  |239    |92     |11776  |368    |100    |48         |864        |?      |
+|L40        |Lovelace   |22.10  |AD102      |8.9    |90.5   |181    |362    |142    |18176  |568    |128    |48 GDDR6   |864        |300    |
+|RTX 4090   |Lovelace   |22.10  |AD102-300  |8.9    |83.8   |167.6  |1330   |128    |16384  |512    |128    |24 GDDR6X  |1008       |450    |
 
 ## What's the CUDA primary context
 
