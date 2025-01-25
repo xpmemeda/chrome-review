@@ -1,0 +1,3 @@
+[submodule "wxg"]
+	path = wxg
+	url = git@git.woa.com:olafxiong/wxg.git
