@@ -346,6 +346,12 @@ class RequestManagerParseFromSvrLog(RequestManagerBase):
         return self._generate_requests(request_infos)
 
 
+class UnifiedOutput:
+    def __init__(self, num_prompt_tokens, num_output_tokens):
+        self.num_prompt_tokens = num_prompt_tokens
+        self.num_output_tokens = num_output_tokens
+
+
 class trtllmBackend:
     def __init__(
         self,
@@ -389,7 +395,7 @@ class trtllmBackend:
         )
         self._sampling_params_cls = trtllm.SamplingParams
 
-    def sampling_params(self, num_output_tokens):
+    def _sampling_params(self, num_output_tokens):
         return self._sampling_params_cls(
             temperature=0.0,
             min_tokens=num_output_tokens,
@@ -403,16 +409,13 @@ class trtllmBackend:
         return trtllm.__version__
 
     async def async_generate(self, prompt, num_output_tokens):
-        sampling_params = self.sampling_params(num_output_tokens)
+        sampling_params = self._sampling_params(num_output_tokens)
         async for output in self._llm.generate_async(
             prompt, sampling_params, streaming=True
         ):
-            yield output
-
-    def get_num_tokens(self, output):
-        num_prompt_tokens = len(output.prompt_token_ids)
-        num_output_tokens = output.outputs[0].length
-        return (num_prompt_tokens, num_output_tokens)
+            num_prompt_tokens = len(output.prompt_token_ids)
+            num_output_tokens = output.outputs[0].length
+            yield UnifiedOutput(num_prompt_tokens, num_output_tokens)
 
 
 class vllmBackend:
@@ -434,7 +437,7 @@ class vllmBackend:
 
         self._sampling_params_cls = vllm.SamplingParams
 
-    def sampling_params(self, num_output_tokens):
+    def _sampling_params(self, num_output_tokens):
         return self._sampling_params_cls(
             temperature=0.0,
             min_tokens=num_output_tokens,
@@ -449,14 +452,11 @@ class vllmBackend:
 
     async def async_generate(self, prompt, num_output_tokens):
         request_id = str(random.randint(0, 10000000))
-        sampling_params = self.sampling_params(num_output_tokens)
+        sampling_params = self._sampling_params(num_output_tokens)
         async for output in self._llm.generate(prompt, sampling_params, request_id):
-            yield output
-
-    def get_num_tokens(self, output):
-        num_prompt_tokens = len(output.prompt_token_ids)
-        num_output_tokens = len(output.outputs[0].token_ids)
-        return (num_prompt_tokens, num_output_tokens)
+            num_prompt_tokens = len(output.prompt_token_ids)
+            num_output_tokens = len(output.outputs[0].token_ids)
+            yield UnifiedOutput(num_prompt_tokens, num_output_tokens)
 
 
 class sglangBackend:
@@ -478,7 +478,7 @@ class sglangBackend:
             model_path=model, max_running_requests=batch_size, disable_cuda_graph=True
         )
 
-    def sampling_params(self, num_output_tokens):
+    def _sampling_params(self, num_output_tokens):
         return {
             "temperature": 0.0,
             "min_new_tokens": num_output_tokens,
@@ -492,15 +492,14 @@ class sglangBackend:
         return sglang.__version__
 
     async def async_generate(self, prompt, num_output_tokens):
-        sampling_params = self.sampling_params(num_output_tokens)
+        sampling_params = self._sampling_params(num_output_tokens)
         async for chunk in await self._llm.async_generate(
             prompt, sampling_params, stream=True
         ):
-            yield chunk
-
-    def get_num_tokens(self, output):
-        metainfo = output["meta_info"]
-        return metainfo["prompt_tokens"], metainfo["completion_tokens"]
+            metainfo = chunk["meta_info"]
+            num_prompt_tokens = metainfo["prompt_tokens"]
+            num_output_tokens = metainfo["completion_tokens"]
+            yield UnifiedOutput(num_prompt_tokens, num_output_tokens)
 
 
 class wnrBackend:
@@ -519,7 +518,7 @@ class wnrBackend:
         self._llm = vllm.AsyncLLMEngine.from_engine_args(engine_args)
         self._sampling_params_cls = vllm.SamplingParams
 
-    def sampling_params(self, num_output_tokens):
+    def _sampling_params(self, num_output_tokens):
         return self._sampling_params_cls(
             temperature=0.0,
             ignore_eos=True,
@@ -533,15 +532,26 @@ class wnrBackend:
         return wnr.__version__
 
     async def async_generate(self, prompt, num_output_tokens):
-        sampling_params = self.sampling_params(num_output_tokens)
+        sampling_params = self._sampling_params(num_output_tokens)
         request_id = str(random.randint(0, 10000000))
         async for output in self._llm.generate(prompt, sampling_params, request_id):
-            yield output
+            num_prompt_tokens = len(output.prompt_token_ids)
+            num_output_tokens = len(output.outputs[0].token_ids)
+            yield UnifiedOutput(num_prompt_tokens, num_output_tokens)
 
-    def get_num_tokens(self, output):
-        num_prompt_tokens = len(output.prompt_token_ids)
-        num_output_tokens = len(output.outputs[0].token_ids)
-        return (num_prompt_tokens, num_output_tokens)
+
+class openaiBackend:
+    def __init__(self, arguments):
+        from openai import OpenAI
+
+        self._client = OpenAI(base_url=arguments.url, api_key=arguments.api_key)
+
+    @classmethod
+    def version(cls):
+        return "unknown"
+
+    async def async_generate(self, prompt, num_output_tokens):
+        pass
 
 
 class Task:
@@ -594,7 +604,7 @@ class Task:
         request_sent_time = time.time()
 
         first_token_time = None
-        async for output in self.engine.async_generate(
+        async for unified_output in self.engine.async_generate(
             prompt, desired_num_output_tokens
         ):
             if first_token_time is None:
@@ -603,7 +613,10 @@ class Task:
         elasped_first_token = first_token_time - request_sent_time
         elasped_request = time.time() - request_sent_time
 
-        num_prompt_tokens, num_output_tokens = self.engine.get_num_tokens(output)
+        num_prompt_tokens, num_output_tokens = (
+            unified_output.num_prompt_tokens,
+            unified_output.num_output_tokens,
+        )
         assert num_output_tokens == desired_num_output_tokens
 
         return PerfMetrics(
@@ -690,7 +703,7 @@ if __name__ == "__main__":
         "--backend",
         type=str,
         required=True,
-        choices=["wnr", "trtllm", "vllm", "sglang"],
+        choices=["wnr", "trtllm", "vllm", "sglang", "openai"],
     )
     parser.add_argument("--model", type=str, required=True)
     parser.add_argument("--n", type=int, help="num prompts.", required=True)
@@ -703,6 +716,12 @@ if __name__ == "__main__":
         type=str,
         help="srv log path, parse iho from it, ignore --i, --h, --o if provided.",
     )
+    parser.add_argument(
+        "--base_url",
+        type=str,
+        help="base_url for url backend, for example: http://127.0.0.1:8000",
+    )
+    parser.add_argument("--api-key", type=str)
     args = parser.parse_args()
 
     asyncio.run(main(args))

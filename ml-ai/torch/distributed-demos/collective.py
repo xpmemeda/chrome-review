@@ -1,41 +1,43 @@
-"""run.py:"""
-
-#!/usr/bin/env python
 import os
-import sys
 import torch
+import argparse
 import torch.distributed as dist
-import torch.multiprocessing as mp
 
 
-def run(rank, size):
-    """Simple collective communication."""
-    group = dist.new_group([0, 1])
-    tensor = torch.ones(1)
-    dist.all_reduce(tensor, op=dist.ReduceOp.SUM, group=group)
-    print("Rank ", rank, " has data ", tensor[0])
+def run(cmd_arguments):
+    device = torch.device("cuda", cmd_arguments.device)
+    tensor = torch.ones(1, device=device)
+    dist.all_reduce(tensor, op=dist.ReduceOp.SUM)
+    print("Rank ", cmd_arguments.rank, " has data ", tensor[0])
 
 
-def init_process(rank, size, fn, backend="gloo"):
-    """Initialize the distributed environment."""
-    os.environ["MASTER_ADDR"] = "127.0.0.1"
-    os.environ["MASTER_PORT"] = "29500"
-    dist.init_process_group(backend, rank=rank, world_size=size)
-    fn(rank, size)
+def init_process_group(cmd_arguments):
+    os.environ["MASTER_ADDR"] = cmd_arguments.master
+    os.environ["MASTER_PORT"] = str(cmd_arguments.port)
+    dist.init_process_group(
+        backend=cmd_arguments.backend,
+        world_size=cmd_arguments.ws,
+        rank=cmd_arguments.rank,
+    )
+
+
+def cleanup_process_group(cmd_arguments):
+    dist.destroy_process_group()
+
+
+def main(cmd_arguments):
+    init_process_group(cmd_arguments)
+    run(cmd_arguments)
+    cleanup_process_group(cmd_arguments)
 
 
 if __name__ == "__main__":
-    world_size = 2
-    processes = []
-    if "google.colab" in sys.modules:
-        print("Running in Google Colab")
-        mp.get_context("spawn")
-    else:
-        mp.set_start_method("spawn")
-    for rank in range(world_size):
-        p = mp.Process(target=init_process, args=(rank, world_size, run))
-        p.start()
-        processes.append(p)
-
-    for p in processes:
-        p.join()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--master", type=str, required=True)
+    parser.add_argument("--port", type=int, required=True)
+    parser.add_argument("--ws", type=int, required=True, help="world size.")
+    parser.add_argument("--rank", type=int, required=True)
+    parser.add_argument("--device", type=int, required=True)
+    parser.add_argument("--backend", type=str, default="nccl", choices=["nccl", "gloo"])
+    cmd_arguments = parser.parse_args()
+    main(cmd_arguments)
