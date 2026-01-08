@@ -1,0 +1,1 @@
+docker run -d --rm --name olafxiong-redis -p 6379:6379 redis
