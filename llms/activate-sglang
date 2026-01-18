@@ -1,0 +1,14 @@
+SGLANG_HOME=${HOME}/envs/sglang
+
+if [ ! -d ${SGLANG_HOME} ]; then
+    python -m venv ${SGLANG_HOME}
+    source ${SGLANG_HOME}/bin/activate
+    python -m pip install packaging wonderwords GPUtil
+    python -m pip install transformers aiohttp orjson uvicorn uvloop fastapi psutil zmq
+    python -m pip install python-multipart torchao
+    python -m pip install torch==2.4.0 torchvision==0.19.0 vllm==0.6.0
+    python -m pip install flashinfer -i https://flashinfer.ai/whl/cu124/torch2.4
+    python -m pip install sglang
+else
+    source ${SGLANG_HOME}/bin/activate
+fi
