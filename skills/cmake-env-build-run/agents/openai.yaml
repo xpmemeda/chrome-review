@@ -1,0 +1,4 @@
+interface:
+  display_name: "CMake Env Build Run"
+  short_description: "Build and run projects via .env and CMake presets"
+  default_prompt: "Use $cmake-env-build-run to configure, build, and run this project with its .env and CMake presets."
