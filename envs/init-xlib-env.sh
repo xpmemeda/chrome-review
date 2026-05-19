@@ -16,12 +16,7 @@ RUSTUP_HOME=$HOME/local/rustup
 CARGO_HOME=$HOME/local/cargo
 NVSHMEM_HOME=$HOME/local/nvshmem
 
-FARM_HASH_HOME=$HOME/local/wnr3rds/farmhash
-HIGHWAY_HASH_HOME=$HOME/local/wnr3rds/highwayhash
-MLAS_HOME=$HOME/local/wnr3rds/mlas
-SVML_HOME=$HOME/local/wnr3rds/svml
-
-wnr_dep_libs=(
+INFRA_LIBS=(
     "$CMAKE_HOME"
     "$GCC_HOME"
     "$GDB_HOME"
@@ -31,10 +26,6 @@ wnr_dep_libs=(
     "$ONEDNN_HOME"
     "$PROTOBUF_HOME"
     "$VECTORCLASS_HOME"
-    "$FARM_HASH_HOME"
-    "$HIGHWAY_HASH_HOME"
-    "$MLAS_HOME"
-    "$SVML_HOME"
     "$CUDNN_HOME"
     "$PATCHELF_HOME"
     "$OPENMPI_HOME"
@@ -43,7 +34,7 @@ wnr_dep_libs=(
     "$CARGO_HOME"
     "$NVSHMEM_HOME"
 )
-for path in "${wnr_dep_libs[@]}"; do
+for path in "${INFRA_LIBS[@]}"; do
     if [ ! -e "$path" ]; then
         echo -e "\033[31mPath does not exist: $path\033[0m"
     fi
@@ -61,14 +52,14 @@ export CMAKE_PREFIX_PATH=
 export CMAKE_PREFIX_PATH=$HOME/local:$CMAKE_PREFIX_PATH
 export CMAKE_PREFIX_PATH=$ONEDNN_HOME:$PROTOBUF_HOME:$LLVM_HOME:$CMAKE_PREFIX_PATH
 
-export CUDNN_HOME FARM_HASH_HOME HIGHWAY_HASH_HOME MLAS_HOME SVML_HOME
+export CUDNN_HOME
 export VECTORCLASS_HOME DNNL_HOME=$ONEDNN_HOME
 export GTEST_HOME
 
 export CC=$(which gcc)
 export CXX=$(which g++)
 
-gcc_version=$(gcc --version 2>&1 | grep -oP '[0-9]+\.[0-9]+\.[0-9]+')
+gcc_version=$(gcc --version 2>&1 | grep -oP '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
 python_version=$(python -c "import sys; print('.'.join(map(str, sys.version_info[:2])))" 2>/dev/null)
 export PS1=$'\033[0;32m'"(python-$python_version) (gcc-$gcc_version)"$'\033[0m'"${PS1-}"
 export PYTHON_SITELIB=$CPYTHON_HOME/lib/python${python_version}/site-packages
