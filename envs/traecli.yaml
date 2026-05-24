@@ -1,0 +1,4 @@
+allowed_tools:
+    - Edit
+model:
+    name: openrouter-1
