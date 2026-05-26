@@ -1,0 +1,15 @@
+- CDN: Content Delivery Network。依靠部署在各地的边缘服务器，通过中心平台的负载均衡、内容分发、调度等功能模块，使用户就近获取所需内容，降低网络拥塞，提高用户访问响应速度和命中率。
+- CoT: Chain of Thought。大模型输出要展示思考过程或者推理步骤，有助于提升推理效果。这个既反映在推理的输出上，同时也是训练要监督优化的地方。
+- DAU: Daily Active Users 的缩写，即日活跃用户数，是衡量产品用户活跃程度的核心指标。
+- GPTQ: GPT Quantization (Generative Pre-trained Transformer)。是一种权重量化方式，它不是简单的计算 scale + zero_point，还会通过校准集计算量化后输出和原始输出的误差，通过算法让这个误差更小。GPTQ 的实现不需要训练配合。
+- HEIC: 并不是某几个单词的缩写，一般表示采用了 HEIF 容器 + HEVC 编码的图片格式就被称为 HEIC。然后很多时候 HEIC 图片也被直接称为 HEIF。
+- HEIF: High Efficiency Image File Format。一种图片容器格式，里面有编码后的图片和一些元信息，但它自身并不约束图片的编码方式。然而 99% 的场合下 HEIF 内部的图片都采用 HEVC 编码，因此大家也常常默认 HEIF 内部就是 HEVC 编码。
+- HEVC: High Efficiency Video Coding，一种视频编码技术，但是也可以用于图片的编码，图片被看作是单帧视频。HEVC 也被叫做 H265，国际电报协会的编号序列。
+- OCR: Optical Character Recognition（光学字符识别），把把图片里的文字变成可编辑文本。
+- PDI: Product RD and Infrastructure（产品研发和工程架构），这是字节跳动覆盖多技术领域、支撑全球业务的核心技术部门，负责计算、存储、视频等基础技术架构的研发，用户、社交、点播、直播、实时通信、内容创作等通用基础产品能力的建设，以及各类产品的研发与质量保障等相关工作。
+- PPL：Perplexity（困惑度），模型在采样的时候，对于正确候选词的概率是不是够高，而不是只看最终有没有选到。概率越高说明模型越有信心。该指标可以用来衡量模型的能力。
+- PSM: Product Subsys Module（产品 - 子系统 - 模块） ：这是字节跳动内部服务的唯一标识，遵循 {product}.{subsystem}.{module} 的三段式命名规范，支撑服务发现、服务治理与成本核算等关键功能，广泛应用于服务间调用、实验配置及服务全生命周期的监控与报警等场景
+- SLA: Service Level Agreement。它通常用于云服务、互联网服务、企业IT、AI推理服务等场景，用来约定：服务质量指标、可用性、延迟、故障恢复时间、赔偿规则。
+- StreamingLLM: 除了用 SWA 保存最近的一些 KVCache 之外，再保存一些 Attention Sink 对应位置（通常是最前面的几个）的 KVCache。相比于 SWA，保留 Sink 位置的 KVCache 之后效果有很大提升。另外也揭示了大模型推理的前缀匹配其实没必要严格从前到后保留 KVCache，SWA 和 StreamingLLM 的实验都论证了这一点。
+- SWA: Sliding Window Attention（滑动窗口注意力），避免全量算上下文的注意力，减少 KVCache 的显存占用，同时减少计算。 
+- ViT: Vision Transformer 的缩写，使用 Transformers 的架构来处理图片，把原始图片的每个像素（像素块）变成 token，整个图片变成 token 序列交给 Transformers 模型去处理。输入叫做 patch embedding，是像素 token 的向量表示，输出叫做 visual embedding，是经过一系列变化的含有位置信息、像素关联信息的张量，要喂给后面的 LLM。patch embedding 和 visual embedding 的维度通常是相同的 [B, N, D]，B 是 batch，N 是 token 数、D 是 hidden_size 的维度。
