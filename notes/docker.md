@@ -31,3 +31,31 @@ du -sh ${data-root}/containers/*
 ## 备注
 
 使用docker自带的``docker system df``显示的磁盘数据信息并不管用，有些容器在运行中产生的很多日志or数据不会被docker统计到。
+
+
+# 容器内
+
+## 怎么看自己是不是在容器内
+
+```bash
+cat /proc/1/cgroup | grep kubepods
+```
+
+看看有没有内容，有的话则说明在容器内，且该容器是由 K8s 管理的。
+
+## 怎么看可用的 CPU 核数
+
+**1. 看 CFS quota**
+
+```bash
+cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us
+cat /sys/fs/cgroup/cpu/cpu.cfs_period_us
+```
+
+二者相除，出现 -1 表示无 quota 限制。
+
+**2. 看可调度的 CPU 核数**
+
+```bash
+nproc
+```
