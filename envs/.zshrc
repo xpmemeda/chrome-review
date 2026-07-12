@@ -35,3 +35,8 @@ fi
 if [ "$SCRIPT_DIR" != "$HOME" ]; then
     source $SCRIPT_DIR/init-bytedance-env.sh
 fi
+
+# 3rds
+if [ "$SCRIPT_DIR" != "$HOME" ]; then
+    source $SCRIPT_DIR/init-3rds-env.sh
+fi

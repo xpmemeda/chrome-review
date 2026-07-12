@@ -1,8 +1,10 @@
+GIT_LFS_HOME=$HOME/local/git-lfs
 CMAKE_HOME=$HOME/local/cmake
 GCC_HOME=$HOME/local/gcc
 GDB_HOME=$HOME/local/gdb
 CPYTHON_HOME=$HOME/local/cpython
 CUDA_HOME=$HOME/local/cuda
+SYS_CUDA_HOME=/usr/local/cuda
 LLVM_HOME=$HOME/local/llvm
 ONEDNN_HOME=$HOME/local/oneDNN
 PROTOBUF_HOME=$HOME/local/protobuf
@@ -16,12 +18,14 @@ RUSTUP_HOME=$HOME/local/rustup
 CARGO_HOME=$HOME/local/cargo
 NVSHMEM_HOME=$HOME/local/nvshmem
 
-INFRA_LIBS=(
+xLIBS=(
+    "$GIT_LFS_HOME"
     "$CMAKE_HOME"
     "$GCC_HOME"
     "$GDB_HOME"
     "$CPYTHON_HOME"
     "$CUDA_HOME"
+    "$SYS_CUDA_HOME"
     "$LLVM_HOME"
     "$ONEDNN_HOME"
     "$PROTOBUF_HOME"
@@ -34,7 +38,7 @@ INFRA_LIBS=(
     "$CARGO_HOME"
     "$NVSHMEM_HOME"
 )
-for path in "${INFRA_LIBS[@]}"; do
+for path in "${xLIBS[@]}"; do
     if [ ! -e "$path" ]; then
         echo -e "\033[31mPath does not exist: $path\033[0m"
     fi
@@ -43,7 +47,8 @@ done
 export PATH=
 export PATH=/usr/local/bin:/usr/bin:/usr/sbin:$PATH
 export PATH=$HOME/local/bin:$PATH
-export PATH=$CPYTHON_HOME/bin:$PROTOBUF_HOME/bin/:$CUDA_HOME/bin:$CMAKE_HOME/bin:$GDB_HOME/bin:$GCC_HOME/bin:$PATH
+export PATH=$HOME/local/git-lfs:$PATH
+export PATH=$CPYTHON_HOME/bin:$PROTOBUF_HOME/bin/:$CUDA_HOME/bin:$SYS_CUDA_HOME/bin:$CMAKE_HOME/bin:$GDB_HOME/bin:$GCC_HOME/bin:$PATH
 export PATH=$PATCHELF_HOME/bin:$PATH
 export PATH=$CARGO_HOME/bin:$OPENMPI_HOME/bin:$UCX_HOME/bin:$PATH
 export PATH=$HOME/local/tmux/bin:$PATH
@@ -73,7 +78,7 @@ export LIBRARY_PATH=$GCC_HOME/lib64:$LIBRARY_PATH
 export LIBRARY_PATH=$NVSHMEM_HOME/lib:$OPENMPI_HOME/lib:$UCX_HOME/lib:$LIBRARY_PATH
 export LD_LIBRARY_PATH=
 export LD_LIBRARY_PATH=/usr/local/lib64:/usr/lib64
-export LD_LIBRARY_PATH=$CUDNN_HOME/lib:$CUDA_HOME/lib64:$GCC_HOME/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$CUDNN_HOME/lib:$CUDA_HOME/lib64:$SYS_CUDA_HOME/lib64:$GCC_HOME/lib64:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=$CPYTHON_HOME/lib:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=$NVSHMEM_HOME/lib:$OPENMPI_HOME/lib:$UCX_HOME/lib:$LD_LIBRARY_PATH
 
