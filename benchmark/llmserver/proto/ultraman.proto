@@ -1,0 +1,209 @@
+syntax = "proto3";
+
+package inference;
+
+// Containers to hold repeated fundamental values.
+message FloatList { repeated double values = 1; }
+
+message Int64List { repeated int64 values = 1; }
+
+message BytesList { repeated bytes values = 1; }
+
+message StringList { repeated string values = 1; }
+
+message Struct {
+    // Unordered map of dynamically typed values.
+    map<string, Value> fields = 1;
+}
+
+message ValueList { repeated Value values = 1; }
+
+message Int64Dict {
+    // Unordered map of dynamically typed values.
+    map<int64, Value> fields = 1;
+}
+
+// Container for non-sequential data.
+message Value {
+    oneof kind {
+        FloatList float_list = 1;
+        Int64List int64_list = 2;
+        BytesList bytes_list = 3;
+        float float_ = 4;
+        int64 int64_ = 5;
+        bytes bytes_ = 6;
+        StringList string_list = 7;
+        string string_ = 8;
+        Struct struct_ = 9;
+        ValueList value_list = 10;
+        Int64Dict int64_dict = 11;
+        bool bool_ = 12;
+    }
+}
+
+// Container for inference request.
+message InferenceRequest {
+    // Request ID.
+    string req_id = 1;
+    // Model Name.
+    string model_name = 2;
+    // Map from input key to value.
+    map<string, Value> inputs = 3;
+    // Method supports chat/tokenize/classification
+    string method = 4;
+    int64 round_id = 5;
+    int64 prequery_round = 6;
+    string tts_answer = 7;
+    optional string task_id = 8;
+}
+
+// Unified return: low-volume status events (second tier alongside the
+// forward_out_payload blob). See llmserver/common/task_event_metas.py.
+enum Role { PREFILL = 0; DECODE = 1; ORCA = 2; MIX = 3; }
+enum EventType { PREPROCESSOR = 0; FIRST_ALLOCATE = 1; CHUNK = 2; CANCELLED = 3; }
+message TaskEvent {
+    double timestamp = 1;
+    Role role = 2;
+    EventType event_type = 3;
+    string task_id = 4;        // event owner task
+    string endpoint = 5;       // emitting instance address, e.g. ip:port
+    optional int64 hit_len = 10;
+    optional int64 miss_len = 11;
+    optional int64 prompt_len = 12;
+    optional int64 new_token_len = 13;
+    optional int64 used_kv_blocks = 14;   // extend = add optional scalar
+    optional string reason = 15;          // cancel reason for CANCELLED events
+    optional int64 computed_len = 16;  // total computed length so far (prefilled + generated) on CHUNK
+}
+
+// Container for inference response.
+message InferenceResponse {
+    // Request ID.
+    string req_id = 1;
+    // Model Name.
+    string model_name = 2;
+    // Map from output key to value.
+    map<string, Value> outputs = 3;
+    optional string task_id = 4;
+    repeated TaskEvent events = 6;
+    optional bytes forward_out_payload = 7;   // opaque ForwardOut SoA blob
+    optional string kvcache_ref = 8;      // extend: KVCacheRef handle
+}
+
+// P-D inner control
+message NotifyRequest {
+    // Notify Type ID.
+    string task_id = 1;
+    int64 op_type = 2;
+    bytes data = 3;
+    // Task.request_id.
+    string req_id = 4;
+}
+
+message NotifyResponse {
+    bool ack = 1;
+    map<string, Value> outputs = 2;
+}
+
+message StartHeadPayload {
+  // request identity, defined by server detail,
+  // refer: https://bytedance.larkoffice.com/wiki/QqujwJDDai8AFYkpp4FcQIdJnVc
+  string req_ctx_json = 1;
+}
+
+message Byte2DArray {
+  repeated bytes values = 1;
+}
+
+message S2SAudio {
+  string id = 1;
+  optional bytes pcm_bytes = 2;
+  optional Byte2DArray embedding = 3;
+  optional string embedding_version = 4;
+}
+
+message DialogContext {
+  string role = 1;
+
+  string text = 2;
+  optional Int64List tts_token_list = 3;
+  optional S2SAudio audio = 4;
+  optional string extra = 5;
+  optional string model_version = 6;
+}
+
+message StreamS2SRequest {
+  string event = 1;
+
+  StartHeadPayload head = 2;
+
+  DialogContext context = 3;
+
+  S2SAudio audio = 4;
+
+  string extra = 5;
+}
+
+message StreamS2SResponse {
+  string event = 1;
+  int32 ret_code = 2;
+  string err_msg = 3;
+
+  optional Int64List speech_token_list = 4;
+  optional Int64List text_token_list = 5;
+  optional string text = 6;
+
+  optional string extra = 7;
+  optional Int64List text_speech_token_list = 8;
+}
+
+// --- Prefetch: quick query returning suggested hub address ---
+message PrefetchRequest {
+    string req_id = 1;
+    string session_id = 2;
+}
+
+message PrefetchResponse {
+    string hub_address = 1;
+}
+
+// --- ServiceStatus: query all endpoint statuses of a service ---
+message ServiceStatusRequest {}
+
+message ServiceEndpointStatus {
+    string address = 1;
+    uint32 weight = 2;
+    string idc = 3;
+}
+
+message ServiceStatusResponse {
+    repeated ServiceEndpointStatus endpoints = 1;
+}
+
+// --- ReloadWeights: hot-reload model weights from a HF safetensors directory ---
+message ReloadWeightsRequest {
+    // Local directory containing HF safetensors (e.g. config.json + model-*-of-*.safetensors).
+    string model_path = 1;
+    // Drain wait before force-cancel (default 100ms when <= 0). Tasks still
+    // running after the window are always force-cancelled.
+    int32 grace_period_ms = 2;
+}
+
+message ReloadWeightsResponse {
+    bool success = 1;
+    string message = 2;
+    // Task ids that were force-cancelled to make room for the reload.
+    repeated string cancelled_task_ids = 3;
+}
+
+service Inference {
+    rpc Call(InferenceRequest) returns (InferenceResponse) {}
+    rpc StreamingCall(InferenceRequest) returns (stream InferenceResponse) {}
+    rpc DistributeCall(InferenceRequest) returns (InferenceResponse) {}
+    rpc NotifyCall(NotifyRequest) returns (NotifyResponse) {}
+    rpc StreamS2S(stream StreamS2SRequest) returns (stream StreamS2SResponse) {}
+    rpc DuplexStreamingCall(stream InferenceRequest) returns (stream InferenceResponse) {}
+    rpc Prefetch(PrefetchRequest) returns (PrefetchResponse) {}
+    rpc QueryServiceStatus(ServiceStatusRequest) returns (ServiceStatusResponse) {}
+    rpc ReloadWeights(ReloadWeightsRequest) returns (ReloadWeightsResponse) {}
+}
