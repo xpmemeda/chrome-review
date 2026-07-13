@@ -21,6 +21,8 @@ class RequestMetrics(ty.NamedTuple):
     server_cached_tokens: ty.Optional[int] = None
     server_usage: ty.Optional[JsonDict] = None
     server_raw_chunks: ty.Tuple[str, ...] = ()
+    x_tt_logid: ty.Optional[str] = None
+    client_send_timestamp: ty.Optional[str] = None
 
 
 def percentile(values: ty.List[float], p: float) -> float:

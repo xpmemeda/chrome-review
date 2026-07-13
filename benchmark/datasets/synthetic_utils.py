@@ -1,6 +1,10 @@
+import hashlib
 import struct
 import typing as ty
 import zlib
+
+PNG_MAX_CHUNK_DATA_SIZE = (1 << 31) - 1
+BYTES_PER_KIB = 1024
 
 
 def check_prompt_prefix_hit_rate(prompt_prefix_hit_rate: float) -> None:
@@ -45,6 +49,30 @@ def _png_chunk(kind: bytes, data: bytes) -> bytes:
 def make_png(width: int, height: int, seed: int) -> bytes:
     rows = make_base_rgb_rows(width, height, seed)
     return encode_png_rgb(width, height, rows)
+
+
+def pad_png_to_size(png: bytes, target_size: int, seed: int) -> bytes:
+    if target_size <= 0 or len(png) >= target_size:
+        return png
+    max_target_size = len(png) + 12 + PNG_MAX_CHUNK_DATA_SIZE
+    if target_size > max_target_size:
+        max_target_kib = max_target_size // BYTES_PER_KIB
+        raise RuntimeError(
+            "IMAGE_TARGET_KIB is too large for a single PNG padding chunk; "
+            f"max IMAGE_TARGET_KIB for this image is {max_target_kib}."
+        )
+    padding_size = target_size - len(png) - 12
+    if padding_size <= 0:
+        return png
+
+    padding = bytearray()
+    counter = 0
+    while len(padding) < padding_size:
+        material = f"{seed}:{counter}".encode("ascii")
+        padding.extend(hashlib.sha256(material).digest())
+        counter += 1
+    chunk = _png_chunk(b"npAD", bytes(padding[:padding_size]))
+    return png[:-12] + chunk + png[-12:]
 
 
 def make_base_rgb_rows(width: int, height: int, seed: int) -> bytearray:

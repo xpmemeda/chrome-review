@@ -1,5 +1,7 @@
 import argparse
 import asyncio
+import base64
+import datetime
 import json
 import logging
 import time
@@ -637,7 +639,9 @@ class BenchmarkEngine:
                         await asyncio.sleep(delay)
                 tasks.append(
                     asyncio.create_task(
-                        send_one(client_idx, request, semaphore, req_idx_base + local_idx)
+                        send_one(
+                            client_idx, request, semaphore, req_idx_base + local_idx
+                        )
                     )
                 )
 
@@ -871,7 +875,9 @@ class BenchmarkEngine:
             mean(server_output_tokens) if server_output_tokens else None
         )
         tpot_tokens = avg_server_output_tokens or avg_output_tokens
-        tpot = "N/A" if tpot_tokens <= 0 else f"{(e2e_avg - ttft_avg) / tpot_tokens:.4f}"
+        tpot = (
+            "N/A" if tpot_tokens <= 0 else f"{(e2e_avg - ttft_avg) / tpot_tokens:.4f}"
+        )
         cache_hit = BenchmarkEngine._format_cache_hit_rate(
             server_cached_tokens,
             server_input_tokens,
@@ -911,30 +917,70 @@ class BenchmarkEngine:
         self,
         label: str,
         client: ty.Any,
+        request: dataset_lib.Request,
         metric: RequestMetrics,
     ) -> None:
         if not self.detail_log_path:
             return
+        del label, client
         item = {
-            "label": label,
-            "client_idx": getattr(client, "_benchmark_client_idx", None),
-            "req_idx": metric.req_idx,
-            "ok": metric.ok,
-            "ttft": metric.ttft,
-            "e2e": metric.e2e,
-            "output_tokens_o200k": metric.output_tokens,
-            "server_output_tokens": metric.server_output_tokens,
-            "server_input_tokens": metric.server_input_tokens,
-            "server_cached_tokens": metric.server_cached_tokens,
-            "server_usage": metric.server_usage,
-            "server_raw_chunks": metric.server_raw_chunks,
-            "output_chars": metric.output_chars,
-            "output_chunks": metric.output_chunks,
-            "error": metric.error,
-            "output": metric.output_text,
+            "client_send_timestamp": metric.client_send_timestamp,
+            "x-tt-logid": metric.x_tt_logid,
+            "response_id": self._extract_first_response_id(metric),
+            "image_bytes": self._extract_first_image_size(request),
+            "ttft": round(metric.ttft, 3),
+            "tpot": self._calculate_metric_tpot(metric),
         }
         with open(self.detail_log_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(item, ensure_ascii=False) + "\n")
+
+    @staticmethod
+    def _calculate_metric_tpot(metric: RequestMetrics) -> ty.Optional[float]:
+        output_tokens = metric.server_output_tokens or metric.output_tokens
+        if not metric.ok or output_tokens <= 0:
+            return None
+        return round(max(0.0, metric.e2e - metric.ttft) / output_tokens, 3)
+
+    @staticmethod
+    def _now_timestamp() -> str:
+        return datetime.datetime.now().astimezone().isoformat(timespec="milliseconds")
+
+    @staticmethod
+    def _extract_first_image_size(request: dataset_lib.Request) -> ty.Optional[int]:
+        for message in request["messages"]:
+            content = message.get("content")
+            if not isinstance(content, list):
+                continue
+            for part in content:
+                if not isinstance(part, dict) or part.get("type") != "image_url":
+                    continue
+                image_url = part.get("image_url")
+                if not isinstance(image_url, dict):
+                    continue
+                url = image_url.get("url")
+                if not isinstance(url, str):
+                    continue
+                header, sep, encoded = url.partition(",")
+                if sep != "," or not header.startswith("data:"):
+                    return None
+                try:
+                    return len(base64.b64decode(encoded, validate=True))
+                except ValueError:
+                    return None
+        return None
+
+    @staticmethod
+    def _extract_first_response_id(metric: RequestMetrics) -> ty.Optional[str]:
+        if not metric.server_raw_chunks:
+            return None
+        try:
+            first_chunk = json.loads(metric.server_raw_chunks[0])
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(first_chunk, dict):
+            return None
+        response_id = first_chunk.get("id")
+        return response_id if isinstance(response_id, str) else None
 
     async def _send_dataset_one(
         self,
@@ -969,8 +1015,11 @@ class BenchmarkEngine:
         req_idx: int,
         label: str,
     ) -> RequestMetrics:
+        client_send_timestamp = self._now_timestamp()
         metric = await client.send_request(req_idx, request)
-        self._write_detail_log(label, client, metric)
+        if metric.client_send_timestamp is None:
+            metric = metric._replace(client_send_timestamp=client_send_timestamp)
+        self._write_detail_log(label, client, request, metric)
         metric_for_summary = metric._replace(output_text="")
         self._record_client_metric(client, metric_for_summary)
         return metric_for_summary
@@ -994,15 +1043,22 @@ class BenchmarkEngine:
                     req_idx = request_queue.get_nowait()
                 except asyncio.QueueEmpty:
                     break
+                request = self.dataset.get(req_idx)
                 try:
-                    metric = await self._send_request(
-                        client, self.dataset.get(req_idx), req_idx, label
-                    )
+                    metric = await self._send_request(client, request, req_idx, label)
                 except Exception as e:
                     metric = RequestMetrics(
-                        req_idx, False, 0.0, 0.0, 0, 0, 0, error=repr(e)
+                        req_idx,
+                        False,
+                        0.0,
+                        0.0,
+                        0,
+                        0,
+                        0,
+                        error=repr(e),
+                        client_send_timestamp=self._now_timestamp(),
                     )
-                    self._write_detail_log(label, client, metric)
+                    self._write_detail_log(label, client, request, metric)
                     self._record_client_metric(client, metric)
                 await results.put(metric)
 

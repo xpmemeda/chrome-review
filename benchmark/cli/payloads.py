@@ -1,0 +1,210 @@
+import time
+import typing as ty
+
+import dataset as dataset_lib
+from metrics import RequestMetrics
+
+from .constants import JsonDict, SDK_CHAT_COMPLETION_KEYS
+from .messages import request_to_openai_messages
+from .tokens import count_output_tokens
+
+
+def build_chat_payload(
+    model: str,
+    request: dataset_lib.Request,
+    max_tokens: int,
+    min_tokens: ty.Optional[int],
+    temperature: float,
+    top_p: ty.Optional[float],
+    extra_body: JsonDict,
+    sampling_params: ty.Optional[JsonDict] = None,
+    include_usage: bool = True,
+) -> JsonDict:
+    payload, request_extra_body = split_sdk_payload_and_extra_body(request)
+    payload.update(
+        {
+            "model": model,
+            "messages": request_to_openai_messages(request),
+            "stream": True,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        }
+    )
+    if include_usage:
+        payload["stream_options"] = {"include_usage": True}
+    if "tool_choice" in payload:
+        payload["tool_choice"] = normalize_tool_choice(payload["tool_choice"])
+    if top_p is not None:
+        payload["top_p"] = top_p
+    merged_extra_body = dict(request_extra_body)
+    merged_extra_body.update(extra_body)
+    if min_tokens is not None:
+        merged_extra_body["min_tokens"] = min_tokens
+    if sampling_params:
+        merged_extra_body.update(sampling_params.get("extra_body", {}))
+        payload.update({k: v for k, v in sampling_params.items() if k != "extra_body"})
+    if merged_extra_body:
+        payload["extra_body"] = merged_extra_body
+    return payload
+
+
+def normalize_tool_choice(tool_choice: ty.Any) -> ty.Any:
+    if not isinstance(tool_choice, dict):
+        return tool_choice
+    string_choice = tool_choice.get("String")
+    if isinstance(string_choice, str):
+        return string_choice
+    tool_function = tool_choice.get("ToolFunction")
+    if isinstance(tool_function, dict):
+        function_name = tool_function.get("name")
+        if isinstance(function_name, str):
+            return {"type": "function", "function": {"name": function_name}}
+    return tool_choice
+
+
+def split_sdk_payload_and_extra_body(request: JsonDict) -> ty.Tuple[JsonDict, JsonDict]:
+    payload = {}
+    extra_body = {}
+    for key, value in request.items():
+        if key == "extra_body":
+            if isinstance(value, dict):
+                extra_body.update(value)
+            else:
+                raise RuntimeError(
+                    "extra_body in dataset request must be a JSON object"
+                )
+        elif key in SDK_CHAT_COMPLETION_KEYS:
+            payload[key] = value
+        else:
+            extra_body[key] = value
+    return payload, extra_body
+
+
+def get_usage_int(usage: ty.Any, key: str) -> ty.Optional[int]:
+    if usage is None:
+        return None
+    if isinstance(usage, dict):
+        value = usage.get(key)
+    else:
+        value = getattr(usage, key, None)
+    return int(value) if isinstance(value, int) else None
+
+
+def get_prompt_cached_tokens(usage: ty.Any) -> ty.Optional[int]:
+    if usage is None:
+        return None
+    if isinstance(usage, dict):
+        details = usage.get("prompt_tokens_details")
+    else:
+        details = getattr(usage, "prompt_tokens_details", None)
+    return get_usage_int(details, "cached_tokens")
+
+
+def usage_to_json(usage: ty.Any) -> ty.Optional[JsonDict]:
+    if usage is None:
+        return None
+    if isinstance(usage, dict):
+        return usage
+    if hasattr(usage, "model_dump"):
+        dumped = usage.model_dump()
+        return dumped if isinstance(dumped, dict) else None
+    if hasattr(usage, "dict"):
+        dumped = usage.dict()
+        return dumped if isinstance(dumped, dict) else None
+    result = {}
+    for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+        value = getattr(usage, key, None)
+        if value is not None:
+            result[key] = value
+    details = getattr(usage, "prompt_tokens_details", None)
+    details_json = usage_to_json(details)
+    if details_json:
+        result["prompt_tokens_details"] = details_json
+    return result or None
+
+
+def chunk_to_raw_text(chunk: ty.Any) -> str:
+    if hasattr(chunk, "model_dump_json"):
+        return chunk.model_dump_json()
+    if hasattr(chunk, "json"):
+        return chunk.json()
+    if isinstance(chunk, dict):
+        import json
+
+        return json.dumps(chunk, ensure_ascii=False)
+    return repr(chunk)
+
+
+async def collect_chat_completion_stream(
+    req_idx: int,
+    stream: ty.Any,
+    stime: float,
+) -> RequestMetrics:
+    ttft: ty.Optional[float] = None
+    last_chunk_at: ty.Optional[float] = None
+    itls: ty.List[float] = []
+    output_text_parts: ty.List[str] = []
+    server_output_tokens = None
+    server_input_tokens = None
+    server_cached_tokens = None
+    server_usage = None
+    server_raw_chunks: ty.List[str] = []
+    output_chars = 0
+    output_chunks = 0
+
+    async for chunk in stream:
+        server_raw_chunks.append(chunk_to_raw_text(chunk))
+        chunk_at = time.perf_counter()
+        if ttft is None:
+            ttft = chunk_at - stime
+        elif last_chunk_at is not None:
+            itls.append(chunk_at - last_chunk_at)
+        last_chunk_at = chunk_at
+        usage = getattr(chunk, "usage", None)
+        usage_json = usage_to_json(usage)
+        prompt_tokens = get_usage_int(usage, "prompt_tokens")
+        completion_tokens = get_usage_int(usage, "completion_tokens")
+        cached_tokens = get_prompt_cached_tokens(usage)
+        if usage_json is not None:
+            server_usage = usage_json
+        if prompt_tokens is not None:
+            server_input_tokens = prompt_tokens
+        if completion_tokens is not None:
+            server_output_tokens = completion_tokens
+        if cached_tokens is not None:
+            server_cached_tokens = cached_tokens
+        choices = getattr(chunk, "choices", None) or []
+        if not choices:
+            continue
+        delta = choices[0].delta
+        model_extra = getattr(delta, "model_extra", None) or {}
+        text_parts = [
+            getattr(delta, "reasoning_content", None)
+            or model_extra.get("reasoning_content"),
+            getattr(delta, "content", None),
+        ]
+        text_len = sum(len(x) for x in text_parts if x)
+        if text_len:
+            output_text_parts.extend(x for x in text_parts if x)
+            output_chars += text_len
+            output_chunks += 1
+
+    etime = time.perf_counter()
+    output_text = "".join(output_text_parts)
+    output_tokens = count_output_tokens(output_text)
+    return RequestMetrics(
+        req_idx,
+        True,
+        ttft if ttft is not None else etime - stime,
+        etime - stime,
+        output_tokens,
+        output_chars,
+        output_chunks,
+        tuple(itls),
+        output_text=output_text,
+        server_output_tokens=server_output_tokens,
+        server_input_tokens=server_input_tokens,
+        server_cached_tokens=server_cached_tokens,
+        server_usage=server_usage,
+        server_raw_chunks=tuple(server_raw_chunks),
+    )

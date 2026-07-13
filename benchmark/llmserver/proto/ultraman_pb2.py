@@ -4,6 +4,7 @@
 # source: ultraman.proto
 # Protobuf Python Version: 6.31.1
 """Generated protocol buffer code."""
+
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
 
@@ -12,7 +13,10 @@ from google.protobuf.internal import builder as _builder
 
 try:
     from google.protobuf import runtime_version as _runtime_version
-    _runtime_version.ValidateProtobufRuntimeVersion(_runtime_version.Domain.PUBLIC, 6, 31, 1, "", "ultraman.proto")
+
+    _runtime_version.ValidateProtobufRuntimeVersion(
+        _runtime_version.Domain.PUBLIC, 6, 31, 1, "", "ultraman.proto"
+    )
 except (ImportError, AttributeError):
     pass
 # @@protoc_insertion_point(imports)
@@ -20,91 +24,91 @@ except (ImportError, AttributeError):
 _sym_db = _symbol_database.Default()
 
 
-
-
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0eultraman.proto\x12\tinference\"\x1b\n\tFloatList\x12\x0e\n\x06values\x18\x01 \x03(\x01\"\x1b\n\tInt64List\x12\x0e\n\x06values\x18\x01 \x03(\x03\"\x1b\n\tBytesList\x12\x0e\n\x06values\x18\x01 \x03(\x0c\"\x1c\n\nStringList\x12\x0e\n\x06values\x18\x01 \x03(\t\"x\n\x06Struct\x12-\n\x06\x66ields\x18\x01 \x03(\x0b\x32\x1d.inference.Struct.FieldsEntry\x1a?\n\x0b\x46ieldsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1f\n\x05value\x18\x02 \x01(\x0b\x32\x10.inference.Value:\x02\x38\x01\"-\n\tValueList\x12 \n\x06values\x18\x01 \x03(\x0b\x32\x10.inference.Value\"~\n\tInt64Dict\x12\x30\n\x06\x66ields\x18\x01 \x03(\x0b\x32 .inference.Int64Dict.FieldsEntry\x1a?\n\x0b\x46ieldsEntry\x12\x0b\n\x03key\x18\x01 \x01(\x03\x12\x1f\n\x05value\x18\x02 \x01(\x0b\x32\x10.inference.Value:\x02\x38\x01\"\x99\x03\n\x05Value\x12*\n\nfloat_list\x18\x01 \x01(\x0b\x32\x14.inference.FloatListH\x00\x12*\n\nint64_list\x18\x02 \x01(\x0b\x32\x14.inference.Int64ListH\x00\x12*\n\nbytes_list\x18\x03 \x01(\x0b\x32\x14.inference.BytesListH\x00\x12\x10\n\x06\x66loat_\x18\x04 \x01(\x02H\x00\x12\x10\n\x06int64_\x18\x05 \x01(\x03H\x00\x12\x10\n\x06\x62ytes_\x18\x06 \x01(\x0cH\x00\x12,\n\x0bstring_list\x18\x07 \x01(\x0b\x32\x15.inference.StringListH\x00\x12\x11\n\x07string_\x18\x08 \x01(\tH\x00\x12$\n\x07struct_\x18\t \x01(\x0b\x32\x11.inference.StructH\x00\x12*\n\nvalue_list\x18\n \x01(\x0b\x32\x14.inference.ValueListH\x00\x12*\n\nint64_dict\x18\x0b \x01(\x0b\x32\x14.inference.Int64DictH\x00\x12\x0f\n\x05\x62ool_\x18\x0c \x01(\x08H\x00\x42\x06\n\x04kind\"\xa0\x02\n\x10InferenceRequest\x12\x0e\n\x06req_id\x18\x01 \x01(\t\x12\x12\n\nmodel_name\x18\x02 \x01(\t\x12\x37\n\x06inputs\x18\x03 \x03(\x0b\x32\'.inference.InferenceRequest.InputsEntry\x12\x0e\n\x06method\x18\x04 \x01(\t\x12\x10\n\x08round_id\x18\x05 \x01(\x03\x12\x16\n\x0eprequery_round\x18\x06 \x01(\x03\x12\x12\n\ntts_answer\x18\x07 \x01(\t\x12\x14\n\x07task_id\x18\x08 \x01(\tH\x00\x88\x01\x01\x1a?\n\x0bInputsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1f\n\x05value\x18\x02 \x01(\x0b\x32\x10.inference.Value:\x02\x38\x01\x42\n\n\x08_task_id\"\xa2\x03\n\tTaskEvent\x12\x11\n\ttimestamp\x18\x01 \x01(\x01\x12\x1d\n\x04role\x18\x02 \x01(\x0e\x32\x0f.inference.Role\x12(\n\nevent_type\x18\x03 \x01(\x0e\x32\x14.inference.EventType\x12\x0f\n\x07task_id\x18\x04 \x01(\t\x12\x10\n\x08\x65ndpoint\x18\x05 \x01(\t\x12\x14\n\x07hit_len\x18\n \x01(\x03H\x00\x88\x01\x01\x12\x15\n\x08miss_len\x18\x0b \x01(\x03H\x01\x88\x01\x01\x12\x17\n\nprompt_len\x18\x0c \x01(\x03H\x02\x88\x01\x01\x12\x1a\n\rnew_token_len\x18\r \x01(\x03H\x03\x88\x01\x01\x12\x1b\n\x0eused_kv_blocks\x18\x0e \x01(\x03H\x04\x88\x01\x01\x12\x13\n\x06reason\x18\x0f \x01(\tH\x05\x88\x01\x01\x12\x19\n\x0c\x63omputed_len\x18\x10 \x01(\x03H\x06\x88\x01\x01\x42\n\n\x08_hit_lenB\x0b\n\t_miss_lenB\r\n\x0b_prompt_lenB\x10\n\x0e_new_token_lenB\x11\n\x0f_used_kv_blocksB\t\n\x07_reasonB\x0f\n\r_computed_len\"\xe1\x02\n\x11InferenceResponse\x12\x0e\n\x06req_id\x18\x01 \x01(\t\x12\x12\n\nmodel_name\x18\x02 \x01(\t\x12:\n\x07outputs\x18\x03 \x03(\x0b\x32).inference.InferenceResponse.OutputsEntry\x12\x14\n\x07task_id\x18\x04 \x01(\tH\x00\x88\x01\x01\x12$\n\x06\x65vents\x18\x06 \x03(\x0b\x32\x14.inference.TaskEvent\x12 \n\x13\x66orward_out_payload\x18\x07 \x01(\x0cH\x01\x88\x01\x01\x12\x18\n\x0bkvcache_ref\x18\x08 \x01(\tH\x02\x88\x01\x01\x1a@\n\x0cOutputsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1f\n\x05value\x18\x02 \x01(\x0b\x32\x10.inference.Value:\x02\x38\x01\x42\n\n\x08_task_idB\x16\n\x14_forward_out_payloadB\x0e\n\x0c_kvcache_ref\"O\n\rNotifyRequest\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x0f\n\x07op_type\x18\x02 \x01(\x03\x12\x0c\n\x04\x64\x61ta\x18\x03 \x01(\x0c\x12\x0e\n\x06req_id\x18\x04 \x01(\t\"\x98\x01\n\x0eNotifyResponse\x12\x0b\n\x03\x61\x63k\x18\x01 \x01(\x08\x12\x37\n\x07outputs\x18\x02 \x03(\x0b\x32&.inference.NotifyResponse.OutputsEntry\x1a@\n\x0cOutputsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1f\n\x05value\x18\x02 \x01(\x0b\x32\x10.inference.Value:\x02\x38\x01\"(\n\x10StartHeadPayload\x12\x14\n\x0creq_ctx_json\x18\x01 \x01(\t\"\x1d\n\x0b\x42yte2DArray\x12\x0e\n\x06values\x18\x01 \x03(\x0c\"\xb0\x01\n\x08S2SAudio\x12\n\n\x02id\x18\x01 \x01(\t\x12\x16\n\tpcm_bytes\x18\x02 \x01(\x0cH\x00\x88\x01\x01\x12.\n\tembedding\x18\x03 \x01(\x0b\x32\x16.inference.Byte2DArrayH\x01\x88\x01\x01\x12\x1e\n\x11\x65mbedding_version\x18\x04 \x01(\tH\x02\x88\x01\x01\x42\x0c\n\n_pcm_bytesB\x0c\n\n_embeddingB\x14\n\x12_embedding_version\"\xf0\x01\n\rDialogContext\x12\x0c\n\x04role\x18\x01 \x01(\t\x12\x0c\n\x04text\x18\x02 \x01(\t\x12\x31\n\x0etts_token_list\x18\x03 \x01(\x0b\x32\x14.inference.Int64ListH\x00\x88\x01\x01\x12\'\n\x05\x61udio\x18\x04 \x01(\x0b\x32\x13.inference.S2SAudioH\x01\x88\x01\x01\x12\x12\n\x05\x65xtra\x18\x05 \x01(\tH\x02\x88\x01\x01\x12\x1a\n\rmodel_version\x18\x06 \x01(\tH\x03\x88\x01\x01\x42\x11\n\x0f_tts_token_listB\x08\n\x06_audioB\x08\n\x06_extraB\x10\n\x0e_model_version\"\xaa\x01\n\x10StreamS2SRequest\x12\r\n\x05\x65vent\x18\x01 \x01(\t\x12)\n\x04head\x18\x02 \x01(\x0b\x32\x1b.inference.StartHeadPayload\x12)\n\x07\x63ontext\x18\x03 \x01(\x0b\x32\x18.inference.DialogContext\x12\"\n\x05\x61udio\x18\x04 \x01(\x0b\x32\x13.inference.S2SAudio\x12\r\n\x05\x65xtra\x18\x05 \x01(\t\"\xe9\x02\n\x11StreamS2SResponse\x12\r\n\x05\x65vent\x18\x01 \x01(\t\x12\x10\n\x08ret_code\x18\x02 \x01(\x05\x12\x0f\n\x07\x65rr_msg\x18\x03 \x01(\t\x12\x34\n\x11speech_token_list\x18\x04 \x01(\x0b\x32\x14.inference.Int64ListH\x00\x88\x01\x01\x12\x32\n\x0ftext_token_list\x18\x05 \x01(\x0b\x32\x14.inference.Int64ListH\x01\x88\x01\x01\x12\x11\n\x04text\x18\x06 \x01(\tH\x02\x88\x01\x01\x12\x12\n\x05\x65xtra\x18\x07 \x01(\tH\x03\x88\x01\x01\x12\x39\n\x16text_speech_token_list\x18\x08 \x01(\x0b\x32\x14.inference.Int64ListH\x04\x88\x01\x01\x42\x14\n\x12_speech_token_listB\x12\n\x10_text_token_listB\x07\n\x05_textB\x08\n\x06_extraB\x19\n\x17_text_speech_token_list\"5\n\x0fPrefetchRequest\x12\x0e\n\x06req_id\x18\x01 \x01(\t\x12\x12\n\nsession_id\x18\x02 \x01(\t\"\'\n\x10PrefetchResponse\x12\x13\n\x0bhub_address\x18\x01 \x01(\t\"\x16\n\x14ServiceStatusRequest\"E\n\x15ServiceEndpointStatus\x12\x0f\n\x07\x61\x64\x64ress\x18\x01 \x01(\t\x12\x0e\n\x06weight\x18\x02 \x01(\r\x12\x0b\n\x03idc\x18\x03 \x01(\t\"L\n\x15ServiceStatusResponse\x12\x33\n\tendpoints\x18\x01 \x03(\x0b\x32 .inference.ServiceEndpointStatus\"C\n\x14ReloadWeightsRequest\x12\x12\n\nmodel_path\x18\x01 \x01(\t\x12\x17\n\x0fgrace_period_ms\x18\x02 \x01(\x05\"U\n\x15ReloadWeightsResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\x1a\n\x12\x63\x61ncelled_task_ids\x18\x03 \x03(\t*2\n\x04Role\x12\x0b\n\x07PREFILL\x10\x00\x12\n\n\x06\x44\x45\x43ODE\x10\x01\x12\x08\n\x04ORCA\x10\x02\x12\x07\n\x03MIX\x10\x03*K\n\tEventType\x12\x10\n\x0cPREPROCESSOR\x10\x00\x12\x12\n\x0e\x46IRST_ALLOCATE\x10\x01\x12\t\n\x05\x43HUNK\x10\x02\x12\r\n\tCANCELLED\x10\x03\x32\xd2\x05\n\tInference\x12\x43\n\x04\x43\x61ll\x12\x1b.inference.InferenceRequest\x1a\x1c.inference.InferenceResponse\"\x00\x12N\n\rStreamingCall\x12\x1b.inference.InferenceRequest\x1a\x1c.inference.InferenceResponse\"\x00\x30\x01\x12M\n\x0e\x44istributeCall\x12\x1b.inference.InferenceRequest\x1a\x1c.inference.InferenceResponse\"\x00\x12\x43\n\nNotifyCall\x12\x18.inference.NotifyRequest\x1a\x19.inference.NotifyResponse\"\x00\x12L\n\tStreamS2S\x12\x1b.inference.StreamS2SRequest\x1a\x1c.inference.StreamS2SResponse\"\x00(\x01\x30\x01\x12V\n\x13\x44uplexStreamingCall\x12\x1b.inference.InferenceRequest\x1a\x1c.inference.InferenceResponse\"\x00(\x01\x30\x01\x12\x45\n\x08Prefetch\x12\x1a.inference.PrefetchRequest\x1a\x1b.inference.PrefetchResponse\"\x00\x12Y\n\x12QueryServiceStatus\x12\x1f.inference.ServiceStatusRequest\x1a .inference.ServiceStatusResponse\"\x00\x12T\n\rReloadWeights\x12\x1f.inference.ReloadWeightsRequest\x1a .inference.ReloadWeightsResponse\"\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
+    b'\n\x0eultraman.proto\x12\tinference"\x1b\n\tFloatList\x12\x0e\n\x06values\x18\x01 \x03(\x01"\x1b\n\tInt64List\x12\x0e\n\x06values\x18\x01 \x03(\x03"\x1b\n\tBytesList\x12\x0e\n\x06values\x18\x01 \x03(\x0c"\x1c\n\nStringList\x12\x0e\n\x06values\x18\x01 \x03(\t"x\n\x06Struct\x12-\n\x06\x66ields\x18\x01 \x03(\x0b\x32\x1d.inference.Struct.FieldsEntry\x1a?\n\x0b\x46ieldsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1f\n\x05value\x18\x02 \x01(\x0b\x32\x10.inference.Value:\x02\x38\x01"-\n\tValueList\x12 \n\x06values\x18\x01 \x03(\x0b\x32\x10.inference.Value"~\n\tInt64Dict\x12\x30\n\x06\x66ields\x18\x01 \x03(\x0b\x32 .inference.Int64Dict.FieldsEntry\x1a?\n\x0b\x46ieldsEntry\x12\x0b\n\x03key\x18\x01 \x01(\x03\x12\x1f\n\x05value\x18\x02 \x01(\x0b\x32\x10.inference.Value:\x02\x38\x01"\x99\x03\n\x05Value\x12*\n\nfloat_list\x18\x01 \x01(\x0b\x32\x14.inference.FloatListH\x00\x12*\n\nint64_list\x18\x02 \x01(\x0b\x32\x14.inference.Int64ListH\x00\x12*\n\nbytes_list\x18\x03 \x01(\x0b\x32\x14.inference.BytesListH\x00\x12\x10\n\x06\x66loat_\x18\x04 \x01(\x02H\x00\x12\x10\n\x06int64_\x18\x05 \x01(\x03H\x00\x12\x10\n\x06\x62ytes_\x18\x06 \x01(\x0cH\x00\x12,\n\x0bstring_list\x18\x07 \x01(\x0b\x32\x15.inference.StringListH\x00\x12\x11\n\x07string_\x18\x08 \x01(\tH\x00\x12$\n\x07struct_\x18\t \x01(\x0b\x32\x11.inference.StructH\x00\x12*\n\nvalue_list\x18\n \x01(\x0b\x32\x14.inference.ValueListH\x00\x12*\n\nint64_dict\x18\x0b \x01(\x0b\x32\x14.inference.Int64DictH\x00\x12\x0f\n\x05\x62ool_\x18\x0c \x01(\x08H\x00\x42\x06\n\x04kind"\xa0\x02\n\x10InferenceRequest\x12\x0e\n\x06req_id\x18\x01 \x01(\t\x12\x12\n\nmodel_name\x18\x02 \x01(\t\x12\x37\n\x06inputs\x18\x03 \x03(\x0b\x32\'.inference.InferenceRequest.InputsEntry\x12\x0e\n\x06method\x18\x04 \x01(\t\x12\x10\n\x08round_id\x18\x05 \x01(\x03\x12\x16\n\x0eprequery_round\x18\x06 \x01(\x03\x12\x12\n\ntts_answer\x18\x07 \x01(\t\x12\x14\n\x07task_id\x18\x08 \x01(\tH\x00\x88\x01\x01\x1a?\n\x0bInputsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1f\n\x05value\x18\x02 \x01(\x0b\x32\x10.inference.Value:\x02\x38\x01\x42\n\n\x08_task_id"\xa2\x03\n\tTaskEvent\x12\x11\n\ttimestamp\x18\x01 \x01(\x01\x12\x1d\n\x04role\x18\x02 \x01(\x0e\x32\x0f.inference.Role\x12(\n\nevent_type\x18\x03 \x01(\x0e\x32\x14.inference.EventType\x12\x0f\n\x07task_id\x18\x04 \x01(\t\x12\x10\n\x08\x65ndpoint\x18\x05 \x01(\t\x12\x14\n\x07hit_len\x18\n \x01(\x03H\x00\x88\x01\x01\x12\x15\n\x08miss_len\x18\x0b \x01(\x03H\x01\x88\x01\x01\x12\x17\n\nprompt_len\x18\x0c \x01(\x03H\x02\x88\x01\x01\x12\x1a\n\rnew_token_len\x18\r \x01(\x03H\x03\x88\x01\x01\x12\x1b\n\x0eused_kv_blocks\x18\x0e \x01(\x03H\x04\x88\x01\x01\x12\x13\n\x06reason\x18\x0f \x01(\tH\x05\x88\x01\x01\x12\x19\n\x0c\x63omputed_len\x18\x10 \x01(\x03H\x06\x88\x01\x01\x42\n\n\x08_hit_lenB\x0b\n\t_miss_lenB\r\n\x0b_prompt_lenB\x10\n\x0e_new_token_lenB\x11\n\x0f_used_kv_blocksB\t\n\x07_reasonB\x0f\n\r_computed_len"\xe1\x02\n\x11InferenceResponse\x12\x0e\n\x06req_id\x18\x01 \x01(\t\x12\x12\n\nmodel_name\x18\x02 \x01(\t\x12:\n\x07outputs\x18\x03 \x03(\x0b\x32).inference.InferenceResponse.OutputsEntry\x12\x14\n\x07task_id\x18\x04 \x01(\tH\x00\x88\x01\x01\x12$\n\x06\x65vents\x18\x06 \x03(\x0b\x32\x14.inference.TaskEvent\x12 \n\x13\x66orward_out_payload\x18\x07 \x01(\x0cH\x01\x88\x01\x01\x12\x18\n\x0bkvcache_ref\x18\x08 \x01(\tH\x02\x88\x01\x01\x1a@\n\x0cOutputsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1f\n\x05value\x18\x02 \x01(\x0b\x32\x10.inference.Value:\x02\x38\x01\x42\n\n\x08_task_idB\x16\n\x14_forward_out_payloadB\x0e\n\x0c_kvcache_ref"O\n\rNotifyRequest\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x0f\n\x07op_type\x18\x02 \x01(\x03\x12\x0c\n\x04\x64\x61ta\x18\x03 \x01(\x0c\x12\x0e\n\x06req_id\x18\x04 \x01(\t"\x98\x01\n\x0eNotifyResponse\x12\x0b\n\x03\x61\x63k\x18\x01 \x01(\x08\x12\x37\n\x07outputs\x18\x02 \x03(\x0b\x32&.inference.NotifyResponse.OutputsEntry\x1a@\n\x0cOutputsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1f\n\x05value\x18\x02 \x01(\x0b\x32\x10.inference.Value:\x02\x38\x01"(\n\x10StartHeadPayload\x12\x14\n\x0creq_ctx_json\x18\x01 \x01(\t"\x1d\n\x0b\x42yte2DArray\x12\x0e\n\x06values\x18\x01 \x03(\x0c"\xb0\x01\n\x08S2SAudio\x12\n\n\x02id\x18\x01 \x01(\t\x12\x16\n\tpcm_bytes\x18\x02 \x01(\x0cH\x00\x88\x01\x01\x12.\n\tembedding\x18\x03 \x01(\x0b\x32\x16.inference.Byte2DArrayH\x01\x88\x01\x01\x12\x1e\n\x11\x65mbedding_version\x18\x04 \x01(\tH\x02\x88\x01\x01\x42\x0c\n\n_pcm_bytesB\x0c\n\n_embeddingB\x14\n\x12_embedding_version"\xf0\x01\n\rDialogContext\x12\x0c\n\x04role\x18\x01 \x01(\t\x12\x0c\n\x04text\x18\x02 \x01(\t\x12\x31\n\x0etts_token_list\x18\x03 \x01(\x0b\x32\x14.inference.Int64ListH\x00\x88\x01\x01\x12\'\n\x05\x61udio\x18\x04 \x01(\x0b\x32\x13.inference.S2SAudioH\x01\x88\x01\x01\x12\x12\n\x05\x65xtra\x18\x05 \x01(\tH\x02\x88\x01\x01\x12\x1a\n\rmodel_version\x18\x06 \x01(\tH\x03\x88\x01\x01\x42\x11\n\x0f_tts_token_listB\x08\n\x06_audioB\x08\n\x06_extraB\x10\n\x0e_model_version"\xaa\x01\n\x10StreamS2SRequest\x12\r\n\x05\x65vent\x18\x01 \x01(\t\x12)\n\x04head\x18\x02 \x01(\x0b\x32\x1b.inference.StartHeadPayload\x12)\n\x07\x63ontext\x18\x03 \x01(\x0b\x32\x18.inference.DialogContext\x12"\n\x05\x61udio\x18\x04 \x01(\x0b\x32\x13.inference.S2SAudio\x12\r\n\x05\x65xtra\x18\x05 \x01(\t"\xe9\x02\n\x11StreamS2SResponse\x12\r\n\x05\x65vent\x18\x01 \x01(\t\x12\x10\n\x08ret_code\x18\x02 \x01(\x05\x12\x0f\n\x07\x65rr_msg\x18\x03 \x01(\t\x12\x34\n\x11speech_token_list\x18\x04 \x01(\x0b\x32\x14.inference.Int64ListH\x00\x88\x01\x01\x12\x32\n\x0ftext_token_list\x18\x05 \x01(\x0b\x32\x14.inference.Int64ListH\x01\x88\x01\x01\x12\x11\n\x04text\x18\x06 \x01(\tH\x02\x88\x01\x01\x12\x12\n\x05\x65xtra\x18\x07 \x01(\tH\x03\x88\x01\x01\x12\x39\n\x16text_speech_token_list\x18\x08 \x01(\x0b\x32\x14.inference.Int64ListH\x04\x88\x01\x01\x42\x14\n\x12_speech_token_listB\x12\n\x10_text_token_listB\x07\n\x05_textB\x08\n\x06_extraB\x19\n\x17_text_speech_token_list"5\n\x0fPrefetchRequest\x12\x0e\n\x06req_id\x18\x01 \x01(\t\x12\x12\n\nsession_id\x18\x02 \x01(\t"\'\n\x10PrefetchResponse\x12\x13\n\x0bhub_address\x18\x01 \x01(\t"\x16\n\x14ServiceStatusRequest"E\n\x15ServiceEndpointStatus\x12\x0f\n\x07\x61\x64\x64ress\x18\x01 \x01(\t\x12\x0e\n\x06weight\x18\x02 \x01(\r\x12\x0b\n\x03idc\x18\x03 \x01(\t"L\n\x15ServiceStatusResponse\x12\x33\n\tendpoints\x18\x01 \x03(\x0b\x32 .inference.ServiceEndpointStatus"C\n\x14ReloadWeightsRequest\x12\x12\n\nmodel_path\x18\x01 \x01(\t\x12\x17\n\x0fgrace_period_ms\x18\x02 \x01(\x05"U\n\x15ReloadWeightsResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\x1a\n\x12\x63\x61ncelled_task_ids\x18\x03 \x03(\t*2\n\x04Role\x12\x0b\n\x07PREFILL\x10\x00\x12\n\n\x06\x44\x45\x43ODE\x10\x01\x12\x08\n\x04ORCA\x10\x02\x12\x07\n\x03MIX\x10\x03*K\n\tEventType\x12\x10\n\x0cPREPROCESSOR\x10\x00\x12\x12\n\x0e\x46IRST_ALLOCATE\x10\x01\x12\t\n\x05\x43HUNK\x10\x02\x12\r\n\tCANCELLED\x10\x03\x32\xd2\x05\n\tInference\x12\x43\n\x04\x43\x61ll\x12\x1b.inference.InferenceRequest\x1a\x1c.inference.InferenceResponse"\x00\x12N\n\rStreamingCall\x12\x1b.inference.InferenceRequest\x1a\x1c.inference.InferenceResponse"\x00\x30\x01\x12M\n\x0e\x44istributeCall\x12\x1b.inference.InferenceRequest\x1a\x1c.inference.InferenceResponse"\x00\x12\x43\n\nNotifyCall\x12\x18.inference.NotifyRequest\x1a\x19.inference.NotifyResponse"\x00\x12L\n\tStreamS2S\x12\x1b.inference.StreamS2SRequest\x1a\x1c.inference.StreamS2SResponse"\x00(\x01\x30\x01\x12V\n\x13\x44uplexStreamingCall\x12\x1b.inference.InferenceRequest\x1a\x1c.inference.InferenceResponse"\x00(\x01\x30\x01\x12\x45\n\x08Prefetch\x12\x1a.inference.PrefetchRequest\x1a\x1b.inference.PrefetchResponse"\x00\x12Y\n\x12QueryServiceStatus\x12\x1f.inference.ServiceStatusRequest\x1a .inference.ServiceStatusResponse"\x00\x12T\n\rReloadWeights\x12\x1f.inference.ReloadWeightsRequest\x1a .inference.ReloadWeightsResponse"\x00\x62\x06proto3'
+)
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
-_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'ultraman_pb2', _globals)
+_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, "ultraman_pb2", _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
-  DESCRIPTOR._loaded_options = None
-  _globals['_STRUCT_FIELDSENTRY']._loaded_options = None
-  _globals['_STRUCT_FIELDSENTRY']._serialized_options = b'8\001'
-  _globals['_INT64DICT_FIELDSENTRY']._loaded_options = None
-  _globals['_INT64DICT_FIELDSENTRY']._serialized_options = b'8\001'
-  _globals['_INFERENCEREQUEST_INPUTSENTRY']._loaded_options = None
-  _globals['_INFERENCEREQUEST_INPUTSENTRY']._serialized_options = b'8\001'
-  _globals['_INFERENCERESPONSE_OUTPUTSENTRY']._loaded_options = None
-  _globals['_INFERENCERESPONSE_OUTPUTSENTRY']._serialized_options = b'8\001'
-  _globals['_NOTIFYRESPONSE_OUTPUTSENTRY']._loaded_options = None
-  _globals['_NOTIFYRESPONSE_OUTPUTSENTRY']._serialized_options = b'8\001'
-  _globals['_ROLE']._serialized_start=3616
-  _globals['_ROLE']._serialized_end=3666
-  _globals['_EVENTTYPE']._serialized_start=3668
-  _globals['_EVENTTYPE']._serialized_end=3743
-  _globals['_FLOATLIST']._serialized_start=29
-  _globals['_FLOATLIST']._serialized_end=56
-  _globals['_INT64LIST']._serialized_start=58
-  _globals['_INT64LIST']._serialized_end=85
-  _globals['_BYTESLIST']._serialized_start=87
-  _globals['_BYTESLIST']._serialized_end=114
-  _globals['_STRINGLIST']._serialized_start=116
-  _globals['_STRINGLIST']._serialized_end=144
-  _globals['_STRUCT']._serialized_start=146
-  _globals['_STRUCT']._serialized_end=266
-  _globals['_STRUCT_FIELDSENTRY']._serialized_start=203
-  _globals['_STRUCT_FIELDSENTRY']._serialized_end=266
-  _globals['_VALUELIST']._serialized_start=268
-  _globals['_VALUELIST']._serialized_end=313
-  _globals['_INT64DICT']._serialized_start=315
-  _globals['_INT64DICT']._serialized_end=441
-  _globals['_INT64DICT_FIELDSENTRY']._serialized_start=378
-  _globals['_INT64DICT_FIELDSENTRY']._serialized_end=441
-  _globals['_VALUE']._serialized_start=444
-  _globals['_VALUE']._serialized_end=853
-  _globals['_INFERENCEREQUEST']._serialized_start=856
-  _globals['_INFERENCEREQUEST']._serialized_end=1144
-  _globals['_INFERENCEREQUEST_INPUTSENTRY']._serialized_start=1069
-  _globals['_INFERENCEREQUEST_INPUTSENTRY']._serialized_end=1132
-  _globals['_TASKEVENT']._serialized_start=1147
-  _globals['_TASKEVENT']._serialized_end=1565
-  _globals['_INFERENCERESPONSE']._serialized_start=1568
-  _globals['_INFERENCERESPONSE']._serialized_end=1921
-  _globals['_INFERENCERESPONSE_OUTPUTSENTRY']._serialized_start=1805
-  _globals['_INFERENCERESPONSE_OUTPUTSENTRY']._serialized_end=1869
-  _globals['_NOTIFYREQUEST']._serialized_start=1923
-  _globals['_NOTIFYREQUEST']._serialized_end=2002
-  _globals['_NOTIFYRESPONSE']._serialized_start=2005
-  _globals['_NOTIFYRESPONSE']._serialized_end=2157
-  _globals['_NOTIFYRESPONSE_OUTPUTSENTRY']._serialized_start=1805
-  _globals['_NOTIFYRESPONSE_OUTPUTSENTRY']._serialized_end=1869
-  _globals['_STARTHEADPAYLOAD']._serialized_start=2159
-  _globals['_STARTHEADPAYLOAD']._serialized_end=2199
-  _globals['_BYTE2DARRAY']._serialized_start=2201
-  _globals['_BYTE2DARRAY']._serialized_end=2230
-  _globals['_S2SAUDIO']._serialized_start=2233
-  _globals['_S2SAUDIO']._serialized_end=2409
-  _globals['_DIALOGCONTEXT']._serialized_start=2412
-  _globals['_DIALOGCONTEXT']._serialized_end=2652
-  _globals['_STREAMS2SREQUEST']._serialized_start=2655
-  _globals['_STREAMS2SREQUEST']._serialized_end=2825
-  _globals['_STREAMS2SRESPONSE']._serialized_start=2828
-  _globals['_STREAMS2SRESPONSE']._serialized_end=3189
-  _globals['_PREFETCHREQUEST']._serialized_start=3191
-  _globals['_PREFETCHREQUEST']._serialized_end=3244
-  _globals['_PREFETCHRESPONSE']._serialized_start=3246
-  _globals['_PREFETCHRESPONSE']._serialized_end=3285
-  _globals['_SERVICESTATUSREQUEST']._serialized_start=3287
-  _globals['_SERVICESTATUSREQUEST']._serialized_end=3309
-  _globals['_SERVICEENDPOINTSTATUS']._serialized_start=3311
-  _globals['_SERVICEENDPOINTSTATUS']._serialized_end=3380
-  _globals['_SERVICESTATUSRESPONSE']._serialized_start=3382
-  _globals['_SERVICESTATUSRESPONSE']._serialized_end=3458
-  _globals['_RELOADWEIGHTSREQUEST']._serialized_start=3460
-  _globals['_RELOADWEIGHTSREQUEST']._serialized_end=3527
-  _globals['_RELOADWEIGHTSRESPONSE']._serialized_start=3529
-  _globals['_RELOADWEIGHTSRESPONSE']._serialized_end=3614
-  _globals['_INFERENCE']._serialized_start=3746
-  _globals['_INFERENCE']._serialized_end=4468
+    DESCRIPTOR._loaded_options = None
+    _globals["_STRUCT_FIELDSENTRY"]._loaded_options = None
+    _globals["_STRUCT_FIELDSENTRY"]._serialized_options = b"8\001"
+    _globals["_INT64DICT_FIELDSENTRY"]._loaded_options = None
+    _globals["_INT64DICT_FIELDSENTRY"]._serialized_options = b"8\001"
+    _globals["_INFERENCEREQUEST_INPUTSENTRY"]._loaded_options = None
+    _globals["_INFERENCEREQUEST_INPUTSENTRY"]._serialized_options = b"8\001"
+    _globals["_INFERENCERESPONSE_OUTPUTSENTRY"]._loaded_options = None
+    _globals["_INFERENCERESPONSE_OUTPUTSENTRY"]._serialized_options = b"8\001"
+    _globals["_NOTIFYRESPONSE_OUTPUTSENTRY"]._loaded_options = None
+    _globals["_NOTIFYRESPONSE_OUTPUTSENTRY"]._serialized_options = b"8\001"
+    _globals["_ROLE"]._serialized_start = 3616
+    _globals["_ROLE"]._serialized_end = 3666
+    _globals["_EVENTTYPE"]._serialized_start = 3668
+    _globals["_EVENTTYPE"]._serialized_end = 3743
+    _globals["_FLOATLIST"]._serialized_start = 29
+    _globals["_FLOATLIST"]._serialized_end = 56
+    _globals["_INT64LIST"]._serialized_start = 58
+    _globals["_INT64LIST"]._serialized_end = 85
+    _globals["_BYTESLIST"]._serialized_start = 87
+    _globals["_BYTESLIST"]._serialized_end = 114
+    _globals["_STRINGLIST"]._serialized_start = 116
+    _globals["_STRINGLIST"]._serialized_end = 144
+    _globals["_STRUCT"]._serialized_start = 146
+    _globals["_STRUCT"]._serialized_end = 266
+    _globals["_STRUCT_FIELDSENTRY"]._serialized_start = 203
+    _globals["_STRUCT_FIELDSENTRY"]._serialized_end = 266
+    _globals["_VALUELIST"]._serialized_start = 268
+    _globals["_VALUELIST"]._serialized_end = 313
+    _globals["_INT64DICT"]._serialized_start = 315
+    _globals["_INT64DICT"]._serialized_end = 441
+    _globals["_INT64DICT_FIELDSENTRY"]._serialized_start = 378
+    _globals["_INT64DICT_FIELDSENTRY"]._serialized_end = 441
+    _globals["_VALUE"]._serialized_start = 444
+    _globals["_VALUE"]._serialized_end = 853
+    _globals["_INFERENCEREQUEST"]._serialized_start = 856
+    _globals["_INFERENCEREQUEST"]._serialized_end = 1144
+    _globals["_INFERENCEREQUEST_INPUTSENTRY"]._serialized_start = 1069
+    _globals["_INFERENCEREQUEST_INPUTSENTRY"]._serialized_end = 1132
+    _globals["_TASKEVENT"]._serialized_start = 1147
+    _globals["_TASKEVENT"]._serialized_end = 1565
+    _globals["_INFERENCERESPONSE"]._serialized_start = 1568
+    _globals["_INFERENCERESPONSE"]._serialized_end = 1921
+    _globals["_INFERENCERESPONSE_OUTPUTSENTRY"]._serialized_start = 1805
+    _globals["_INFERENCERESPONSE_OUTPUTSENTRY"]._serialized_end = 1869
+    _globals["_NOTIFYREQUEST"]._serialized_start = 1923
+    _globals["_NOTIFYREQUEST"]._serialized_end = 2002
+    _globals["_NOTIFYRESPONSE"]._serialized_start = 2005
+    _globals["_NOTIFYRESPONSE"]._serialized_end = 2157
+    _globals["_NOTIFYRESPONSE_OUTPUTSENTRY"]._serialized_start = 1805
+    _globals["_NOTIFYRESPONSE_OUTPUTSENTRY"]._serialized_end = 1869
+    _globals["_STARTHEADPAYLOAD"]._serialized_start = 2159
+    _globals["_STARTHEADPAYLOAD"]._serialized_end = 2199
+    _globals["_BYTE2DARRAY"]._serialized_start = 2201
+    _globals["_BYTE2DARRAY"]._serialized_end = 2230
+    _globals["_S2SAUDIO"]._serialized_start = 2233
+    _globals["_S2SAUDIO"]._serialized_end = 2409
+    _globals["_DIALOGCONTEXT"]._serialized_start = 2412
+    _globals["_DIALOGCONTEXT"]._serialized_end = 2652
+    _globals["_STREAMS2SREQUEST"]._serialized_start = 2655
+    _globals["_STREAMS2SREQUEST"]._serialized_end = 2825
+    _globals["_STREAMS2SRESPONSE"]._serialized_start = 2828
+    _globals["_STREAMS2SRESPONSE"]._serialized_end = 3189
+    _globals["_PREFETCHREQUEST"]._serialized_start = 3191
+    _globals["_PREFETCHREQUEST"]._serialized_end = 3244
+    _globals["_PREFETCHRESPONSE"]._serialized_start = 3246
+    _globals["_PREFETCHRESPONSE"]._serialized_end = 3285
+    _globals["_SERVICESTATUSREQUEST"]._serialized_start = 3287
+    _globals["_SERVICESTATUSREQUEST"]._serialized_end = 3309
+    _globals["_SERVICEENDPOINTSTATUS"]._serialized_start = 3311
+    _globals["_SERVICEENDPOINTSTATUS"]._serialized_end = 3380
+    _globals["_SERVICESTATUSRESPONSE"]._serialized_start = 3382
+    _globals["_SERVICESTATUSRESPONSE"]._serialized_end = 3458
+    _globals["_RELOADWEIGHTSREQUEST"]._serialized_start = 3460
+    _globals["_RELOADWEIGHTSREQUEST"]._serialized_end = 3527
+    _globals["_RELOADWEIGHTSRESPONSE"]._serialized_start = 3529
+    _globals["_RELOADWEIGHTSRESPONSE"]._serialized_end = 3614
+    _globals["_INFERENCE"]._serialized_start = 3746
+    _globals["_INFERENCE"]._serialized_end = 4468
 # @@protoc_insertion_point(module_scope)
