@@ -1,7 +1,6 @@
 import asyncio
 import datetime
 import mimetypes
-import os
 import sys
 import time
 import typing as ty
@@ -11,442 +10,15 @@ import uuid
 import dataset as dataset_lib
 from metrics import RequestMetrics
 
-JsonDict = ty.Dict[str, ty.Any]
-TokenCounter = ty.Callable[[str], int]
-
-MODELAPI_BASE_URL = "https://device-intelligence.bytedance.net/api/v1"
-ARK_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3"
-ULTRAMAN_DEFAULT_HOST = "127.0.0.1"
-ULTRAMAN_DEFAULT_PORT = 50050
-ULTRAMAN_PROTO_PATH = os.path.dirname(__file__)
-ULTRAMAN_RESERVED_OUTPUT_TOKENS = 8
-_OUTPUT_TOKEN_COUNTER: ty.Optional[TokenCounter] = None
-SDK_CHAT_COMPLETION_KEYS = {
-    "audio",
-    "extra_body",
-    "frequency_penalty",
-    "function_call",
-    "functions",
-    "logit_bias",
-    "logprobs",
-    "max_completion_tokens",
-    "max_tokens",
-    "messages",
-    "metadata",
-    "modalities",
-    "model",
-    "n",
-    "parallel_tool_calls",
-    "prediction",
-    "presence_penalty",
-    "reasoning_effort",
-    "response_format",
-    "seed",
-    "service_tier",
-    "stop",
-    "store",
-    "stream",
-    "stream_options",
-    "temperature",
-    "tool_choice",
-    "tools",
-    "top_logprobs",
-    "top_p",
-    "user",
-}
-
-
-def split_http_url(url: str) -> ty.Tuple[str, int, str]:
-    parsed = urllib.parse.urlparse(url)
-    if parsed.scheme != "http":
-        raise ValueError("Only http:// URLs are supported by the stdlib async client.")
-    if not parsed.hostname:
-        raise ValueError(f"Invalid URL: {url}")
-    port = parsed.port or 80
-    path = parsed.path or "/"
-    if parsed.query:
-        path += "?" + parsed.query
-    return parsed.hostname, port, path
-
-
-class AsyncMultipartHttpClient:
-    def __init__(self, url: str, timeout: float) -> None:
-        self.host, self.port, self.path = split_http_url(url)
-        self.timeout = timeout
-
-    async def post_multipart(
-        self,
-        data: ty.Dict[str, str],
-        files: ty.Dict[str, ty.Tuple[str, bytes, str]],
-    ) -> ty.Tuple[float, bytes]:
-        body, content_type = encode_multipart_form_data(data, files)
-        reader, writer = await asyncio.wait_for(
-            asyncio.open_connection(self.host, self.port), timeout=self.timeout
-        )
-        try:
-            headers = [
-                f"POST {self.path} HTTP/1.1",
-                f"Host: {self.host}:{self.port}",
-                f"Content-Type: {content_type}",
-                f"Content-Length: {len(body)}",
-                "Connection: close",
-                "",
-                "",
-            ]
-            writer.write("\r\n".join(headers).encode() + body)
-            await asyncio.wait_for(writer.drain(), timeout=self.timeout)
-
-            status_line = await asyncio.wait_for(
-                reader.readline(), timeout=self.timeout
-            )
-            if not status_line:
-                raise RuntimeError("empty HTTP response")
-            parts = status_line.decode("latin1").strip().split(" ", 2)
-            status = int(parts[1]) if len(parts) >= 2 and parts[1].isdigit() else 0
-
-            resp_headers: JsonDict = {}
-            while True:
-                line = await asyncio.wait_for(reader.readline(), timeout=self.timeout)
-                if line in (b"\r\n", b"\n", b""):
-                    break
-                name, _, value = line.decode("latin1").partition(":")
-                resp_headers[name.lower()] = value.strip().lower()
-
-            chunks: ty.List[bytes] = []
-            if resp_headers.get("transfer-encoding") == "chunked":
-                async for _, chunk in self._read_chunked(reader):
-                    chunks.append(chunk)
-            else:
-                while True:
-                    chunk = await asyncio.wait_for(
-                        reader.read(65536), timeout=self.timeout
-                    )
-                    if not chunk:
-                        break
-                    chunks.append(chunk)
-            data_bytes = b"".join(chunks)
-
-            if status < 200 or status >= 300:
-                err = data_bytes[:4096].decode("utf-8", "replace")
-                raise RuntimeError(f"HTTP {status}: {err}")
-            return time.perf_counter(), data_bytes
-        finally:
-            writer.close()
-            try:
-                await writer.wait_closed()
-            except Exception:
-                pass
-
-    async def _read_chunked(
-        self, reader: asyncio.StreamReader
-    ) -> ty.AsyncIterator[ty.Tuple[float, bytes]]:
-        while True:
-            line = await asyncio.wait_for(reader.readline(), timeout=self.timeout)
-            if not line:
-                break
-            size_text = line.split(b";", 1)[0].strip()
-            if not size_text:
-                continue
-            size = int(size_text, 16)
-            if size == 0:
-                await asyncio.wait_for(reader.readline(), timeout=self.timeout)
-                break
-            data = await asyncio.wait_for(
-                reader.readexactly(size), timeout=self.timeout
-            )
-            await asyncio.wait_for(reader.readexactly(2), timeout=self.timeout)
-            yield time.perf_counter(), data
-
-
-def encode_multipart_form_data(
-    data: ty.Dict[str, str],
-    files: ty.Dict[str, ty.Tuple[str, bytes, str]],
-) -> ty.Tuple[bytes, str]:
-    boundary = f"----benchmark-{uuid.uuid4().hex}"
-    body = bytearray()
-    for name, value in data.items():
-        body.extend(f"--{boundary}\r\n".encode())
-        body.extend(f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode())
-        body.extend(value.encode())
-        body.extend(b"\r\n")
-    for name, (filename, content, content_type) in files.items():
-        body.extend(f"--{boundary}\r\n".encode())
-        body.extend(
-            (
-                f'Content-Disposition: form-data; name="{name}"; '
-                f'filename="{filename}"\r\n'
-            ).encode()
-        )
-        body.extend(f"Content-Type: {content_type}\r\n\r\n".encode())
-        body.extend(content)
-        body.extend(b"\r\n")
-    body.extend(f"--{boundary}--\r\n".encode())
-    return bytes(body), f"multipart/form-data; boundary={boundary}"
-
-
-def request_to_openai_messages(request: dataset_lib.Request) -> ty.List[JsonDict]:
-    return list(request["messages"])
-
-
-def iter_message_text(messages: ty.Iterable[JsonDict]) -> ty.Iterator[str]:
-    for message in messages:
-        content = message.get("content")
-        if isinstance(content, str):
-            yield content
-        elif isinstance(content, list):
-            for part in content:
-                if isinstance(part, dict) and part.get("type") == "text":
-                    yield str(part.get("text", ""))
-
-
-def extract_first_image_url(messages: ty.Iterable[JsonDict]) -> ty.Optional[str]:
-    for message in messages:
-        content = message.get("content")
-        if not isinstance(content, list):
-            continue
-        for part in content:
-            if not isinstance(part, dict) or part.get("type") != "image_url":
-                continue
-            image_url = part.get("image_url")
-            if isinstance(image_url, dict) and isinstance(image_url.get("url"), str):
-                return image_url["url"]
-    return None
-
-
-def decode_data_url(data_url: str) -> ty.Tuple[str, bytes]:
-    header, sep, encoded = data_url.partition(",")
-    if sep != "," or not header.startswith("data:"):
-        raise RuntimeError("image_url must be a base64 data URL.")
-    mime = header[len("data:") :].split(";", 1)[0]
-    if not mime:
-        raise RuntimeError("image_url data URL must include a MIME type.")
-    import base64
-
-    return mime, base64.b64decode(encoded)
-
-
-def count_output_tokens(text: str) -> int:
-    if not text:
-        return 0
-    return get_output_token_counter()(text)
-
-
-def get_output_token_counter() -> TokenCounter:
-    global _OUTPUT_TOKEN_COUNTER
-    if _OUTPUT_TOKEN_COUNTER is None:
-        _OUTPUT_TOKEN_COUNTER = build_output_token_counter()
-    return _OUTPUT_TOKEN_COUNTER
-
-
-def build_output_token_counter() -> TokenCounter:
-    try:
-        import tiktoken
-    except ImportError as e:
-        raise RuntimeError(
-            "Local output token counting requires the tiktoken Python package."
-        ) from e
-
-    encoding = tiktoken.get_encoding("o200k_base")
-    return lambda text, encoding=encoding: len(encoding.encode(text))
-
-
-def build_chat_payload(
-    model: str,
-    request: dataset_lib.Request,
-    max_tokens: int,
-    min_tokens: ty.Optional[int],
-    temperature: float,
-    top_p: ty.Optional[float],
-    extra_body: JsonDict,
-    sampling_params: ty.Optional[JsonDict] = None,
-    include_usage: bool = True,
-) -> JsonDict:
-    payload, request_extra_body = split_sdk_payload_and_extra_body(request)
-    payload.update(
-        {
-            "model": model,
-            "messages": request_to_openai_messages(request),
-            "stream": True,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-        }
-    )
-    if include_usage:
-        payload["stream_options"] = {"include_usage": True}
-    if "tool_choice" in payload:
-        payload["tool_choice"] = normalize_tool_choice(payload["tool_choice"])
-    if top_p is not None:
-        payload["top_p"] = top_p
-    merged_extra_body = dict(request_extra_body)
-    merged_extra_body.update(extra_body)
-    if min_tokens is not None:
-        merged_extra_body["min_tokens"] = min_tokens
-    if sampling_params:
-        merged_extra_body.update(sampling_params.get("extra_body", {}))
-        payload.update({k: v for k, v in sampling_params.items() if k != "extra_body"})
-    if merged_extra_body:
-        payload["extra_body"] = merged_extra_body
-    return payload
-
-
-def normalize_tool_choice(tool_choice: ty.Any) -> ty.Any:
-    if not isinstance(tool_choice, dict):
-        return tool_choice
-    string_choice = tool_choice.get("String")
-    if isinstance(string_choice, str):
-        return string_choice
-    tool_function = tool_choice.get("ToolFunction")
-    if isinstance(tool_function, dict):
-        function_name = tool_function.get("name")
-        if isinstance(function_name, str):
-            return {"type": "function", "function": {"name": function_name}}
-    return tool_choice
-
-
-def split_sdk_payload_and_extra_body(request: JsonDict) -> ty.Tuple[JsonDict, JsonDict]:
-    payload = {}
-    extra_body = {}
-    for key, value in request.items():
-        if key == "extra_body":
-            if isinstance(value, dict):
-                extra_body.update(value)
-            else:
-                raise RuntimeError("extra_body in dataset request must be a JSON object")
-        elif key in SDK_CHAT_COMPLETION_KEYS:
-            payload[key] = value
-        else:
-            extra_body[key] = value
-    return payload, extra_body
-
-
-def get_usage_int(usage: ty.Any, key: str) -> ty.Optional[int]:
-    if usage is None:
-        return None
-    if isinstance(usage, dict):
-        value = usage.get(key)
-    else:
-        value = getattr(usage, key, None)
-    return int(value) if isinstance(value, int) else None
-
-
-def get_prompt_cached_tokens(usage: ty.Any) -> ty.Optional[int]:
-    if usage is None:
-        return None
-    if isinstance(usage, dict):
-        details = usage.get("prompt_tokens_details")
-    else:
-        details = getattr(usage, "prompt_tokens_details", None)
-    return get_usage_int(details, "cached_tokens")
-
-
-def usage_to_json(usage: ty.Any) -> ty.Optional[JsonDict]:
-    if usage is None:
-        return None
-    if isinstance(usage, dict):
-        return usage
-    if hasattr(usage, "model_dump"):
-        dumped = usage.model_dump()
-        return dumped if isinstance(dumped, dict) else None
-    if hasattr(usage, "dict"):
-        dumped = usage.dict()
-        return dumped if isinstance(dumped, dict) else None
-    result = {}
-    for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
-        value = getattr(usage, key, None)
-        if value is not None:
-            result[key] = value
-    details = getattr(usage, "prompt_tokens_details", None)
-    details_json = usage_to_json(details)
-    if details_json:
-        result["prompt_tokens_details"] = details_json
-    return result or None
-
-
-def chunk_to_raw_text(chunk: ty.Any) -> str:
-    if hasattr(chunk, "model_dump_json"):
-        return chunk.model_dump_json()
-    if hasattr(chunk, "json"):
-        return chunk.json()
-    if isinstance(chunk, dict):
-        import json
-
-        return json.dumps(chunk, ensure_ascii=False)
-    return repr(chunk)
-
-
-async def collect_chat_completion_stream(
-    req_idx: int,
-    stream: ty.Any,
-    stime: float,
-) -> RequestMetrics:
-    ttft: ty.Optional[float] = None
-    last_chunk_at: ty.Optional[float] = None
-    itls: ty.List[float] = []
-    output_text_parts: ty.List[str] = []
-    server_output_tokens = None
-    server_input_tokens = None
-    server_cached_tokens = None
-    server_usage = None
-    server_raw_chunks: ty.List[str] = []
-    output_chars = 0
-    output_chunks = 0
-
-    async for chunk in stream:
-        server_raw_chunks.append(chunk_to_raw_text(chunk))
-        chunk_at = time.perf_counter()
-        if ttft is None:
-            ttft = chunk_at - stime
-        elif last_chunk_at is not None:
-            itls.append(chunk_at - last_chunk_at)
-        last_chunk_at = chunk_at
-        usage = getattr(chunk, "usage", None)
-        usage_json = usage_to_json(usage)
-        prompt_tokens = get_usage_int(usage, "prompt_tokens")
-        completion_tokens = get_usage_int(usage, "completion_tokens")
-        cached_tokens = get_prompt_cached_tokens(usage)
-        if usage_json is not None:
-            server_usage = usage_json
-        if prompt_tokens is not None:
-            server_input_tokens = prompt_tokens
-        if completion_tokens is not None:
-            server_output_tokens = completion_tokens
-        if cached_tokens is not None:
-            server_cached_tokens = cached_tokens
-        choices = getattr(chunk, "choices", None) or []
-        if not choices:
-            continue
-        delta = choices[0].delta
-        model_extra = getattr(delta, "model_extra", None) or {}
-        text_parts = [
-            getattr(delta, "reasoning_content", None)
-            or model_extra.get("reasoning_content"),
-            getattr(delta, "content", None),
-        ]
-        text_len = sum(len(x) for x in text_parts if x)
-        if text_len:
-            output_text_parts.extend(x for x in text_parts if x)
-            output_chars += text_len
-            output_chunks += 1
-
-    etime = time.perf_counter()
-    output_text = "".join(output_text_parts)
-    output_tokens = count_output_tokens(output_text)
-    return RequestMetrics(
-        req_idx,
-        True,
-        ttft if ttft is not None else etime - stime,
-        etime - stime,
-        output_tokens,
-        output_chars,
-        output_chunks,
-        tuple(itls),
-        output_text=output_text,
-        server_output_tokens=server_output_tokens,
-        server_input_tokens=server_input_tokens,
-        server_cached_tokens=server_cached_tokens,
-        server_usage=server_usage,
-        server_raw_chunks=tuple(server_raw_chunks),
-    )
+from .constants import (
+    JsonDict,
+    ULTRAMAN_DEFAULT_PORT,
+    ULTRAMAN_RESERVED_OUTPUT_TOKENS,
+)
+from .http import AsyncMultipartHttpClient
+from .messages import decode_data_url, extract_first_image_url, iter_message_text
+from .payloads import build_chat_payload, collect_chat_completion_stream
+from .tokens import count_output_tokens
 
 
 class SdkChatClient:
@@ -487,6 +59,31 @@ class SdkChatClient:
             include_usage=self.include_usage,
         )
 
+    def build_extra_headers(self, req_idx: int) -> ty.Optional[JsonDict]:
+        del req_idx
+        return None
+
+    def _attach_extra_headers(
+        self,
+        metric: RequestMetrics,
+        extra_headers: ty.Optional[JsonDict],
+    ) -> RequestMetrics:
+        if not extra_headers:
+            return metric
+        x_tt_logid = extra_headers.get("x-tt-logid")
+        if not isinstance(x_tt_logid, str):
+            return metric
+        return metric._replace(x_tt_logid=x_tt_logid)
+
+    def _attach_client_send_timestamp(
+        self,
+        metric: RequestMetrics,
+        client_send_timestamp: ty.Optional[str],
+    ) -> RequestMetrics:
+        if client_send_timestamp is None:
+            return metric
+        return metric._replace(client_send_timestamp=client_send_timestamp)
+
     async def send_request(
         self,
         req_idx: int,
@@ -494,24 +91,37 @@ class SdkChatClient:
         sampling_params: ty.Optional[JsonDict] = None,
     ) -> RequestMetrics:
         stime = time.perf_counter()
+        extra_headers = None
+        client_send_timestamp = None
         try:
-            stream = await self.client.chat.completions.create(
-                **self.build_payload(request, sampling_params)
+            payload = self.build_payload(request, sampling_params)
+            extra_headers = self.build_extra_headers(req_idx)
+            if extra_headers:
+                payload["extra_headers"] = extra_headers
+            client_send_timestamp = datetime.datetime.now().astimezone().isoformat(
+                timespec="milliseconds"
             )
-            return await collect_chat_completion_stream(req_idx, stream, stime)
+            stream = await self.client.chat.completions.create(**payload)
+            metric = await collect_chat_completion_stream(req_idx, stream, stime)
+            metric = self._attach_extra_headers(metric, extra_headers)
+            return self._attach_client_send_timestamp(metric, client_send_timestamp)
         except Exception as e:
             etime = time.perf_counter()
-            return RequestMetrics(
-                req_idx,
-                False,
-                0.0,
-                etime - stime,
-                0,
-                0,
-                0,
-                (),
-                repr(e),
+            metric = self._attach_extra_headers(
+                RequestMetrics(
+                    req_idx,
+                    False,
+                    0.0,
+                    etime - stime,
+                    0,
+                    0,
+                    0,
+                    (),
+                    repr(e),
+                ),
+                extra_headers,
             )
+            return self._attach_client_send_timestamp(metric, client_send_timestamp)
 
 
 class OpenAIClient(SdkChatClient):
@@ -635,12 +245,21 @@ class ModelApiClient(SdkChatClient):
         )
         self.user = f"benchmark-modelapi-{uuid.uuid4().hex}"
 
+    def build_extra_headers(self, req_idx: int) -> JsonDict:
+        del req_idx
+        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        return {"x-tt-logid": timestamp + uuid.uuid4().hex[:20].upper()}
+
     def build_payload(
         self,
         request: dataset_lib.Request,
         sampling_params: ty.Optional[JsonDict] = None,
     ) -> JsonDict:
         payload = super().build_payload(request, sampling_params)
+        max_completion_tokens = payload.pop("max_tokens", self.max_tokens)
+        extra_body = dict(payload.get("extra_body") or {})
+        extra_body["max_completion_tokens"] = max_completion_tokens
+        payload["extra_body"] = extra_body
         payload["user"] = self.user
         return payload
 
@@ -890,9 +509,9 @@ class UltramanClient:
                     raise RuntimeError("image_url.url must be a string")
                 _, image_bytes = decode_data_url(url)
                 part_struct.fields["type"].string_ = "image_binary"
-                part_struct.fields["image_binary"].struct_.fields["binary"].bytes_ = (
-                    image_bytes
-                )
+                part_struct.fields["image_binary"].struct_.fields[
+                    "binary"
+                ].bytes_ = image_bytes
             elif part_type == "image_binary":
                 part_struct.fields["image_binary"].struct_.fields["binary"].bytes_ = (
                     part["image_binary"]["binary"]
@@ -984,9 +603,7 @@ class UltramanClient:
         if response.HasField("task_id"):
             raw["task_id"] = response.task_id
         if response.HasField("forward_out_payload"):
-            raw["forward_out_payload"] = (
-                f"<bytes:{len(response.forward_out_payload)}>"
-            )
+            raw["forward_out_payload"] = f"<bytes:{len(response.forward_out_payload)}>"
         if response.HasField("kvcache_ref"):
             raw["kvcache_ref"] = response.kvcache_ref
         return json.dumps(raw, ensure_ascii=False)

@@ -96,9 +96,7 @@ async def async_main(args: argparse.Namespace):
                 req_idx=scheduled_request.req_idx + request_idx_offset,
                 scheduled_at=scheduled_request.scheduled_at,
             )
-            for scheduled_request in build_arrival_planner(args, qps).plan(
-                num_requests
-            )
+            for scheduled_request in build_arrival_planner(args, qps).plan(num_requests)
         ]
         log_arrival_plan(label, qps, arrival_plan)
         await benchmark.run_warmup(

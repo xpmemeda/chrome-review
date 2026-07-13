@@ -13,7 +13,10 @@ from .synthetic_utils import (
     make_base_rgb_rows,
     make_synthetic_prompt,
     make_synthetic_system_prompt,
+    pad_png_to_size,
 )
+
+IMAGE_TARGET_KIB = 32
 
 
 class SyntheticVlmDataset(VlmDataset):
@@ -45,6 +48,7 @@ class SyntheticVlmDataset(VlmDataset):
         self.image_width = image_width
         self.image_height = image_height
         self.image_seed = image_seed
+        self.image_target_bytes = IMAGE_TARGET_KIB * 1024
         self.system_prompt = make_synthetic_system_prompt(self.num_prompt_prefix_tokens)
         self.base_rows = make_base_rgb_rows(
             self.image_width,
@@ -56,10 +60,11 @@ class SyntheticVlmDataset(VlmDataset):
 
         logging.info(
             "preparing synthetic vlm dataset ing, seed=%d, image_width=%d, "
-            "image_height=%d, prompt_prefix_hit_rate=%.4f",
+            "image_height=%d, image_target_kib=%d, prompt_prefix_hit_rate=%.4f",
             self.image_seed,
             self.image_width,
             self.image_height,
+            IMAGE_TARGET_KIB,
             prompt_prefix_hit_rate,
         )
         self._prepare(num_requests)
@@ -68,7 +73,8 @@ class SyntheticVlmDataset(VlmDataset):
     def _make_png(self, req_idx: int) -> bytes:
         rows = bytearray(self.base_rows)
         self._patch_rows(rows, req_idx)
-        return encode_png_rgb(self.image_width, self.image_height, rows)
+        png = encode_png_rgb(self.image_width, self.image_height, rows)
+        return pad_png_to_size(png, self.image_target_bytes, self.image_seed + req_idx)
 
     def _patch_rows(self, rows: bytearray, req_idx: int) -> None:
         rng = random.Random(self.image_seed + req_idx)
