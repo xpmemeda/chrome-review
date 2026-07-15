@@ -1,4 +1,4 @@
-from .base import JsonDict, Messages, Request, StdChatApiRequest, VlmDataset
+from .base import JsonDict, Messages, StdChatApiRequest, VlmDataset
 from .jsonl import JsonlTextDataset
 from .omni_multi_message import OmniMultiMessageDataset
 from .synthetic_text import SyntheticTextDataset
@@ -21,7 +21,6 @@ __all__ = [
     "JsonlTextDataset",
     "Messages",
     "OmniMultiMessageDataset",
-    "Request",
     "StdChatApiRequest",
     "SyntheticTextDataset",
     "SyntheticVlmDataset",

@@ -88,7 +88,7 @@ async def async_main(args: argparse.Namespace):
     benchmark = engine.BenchmarkEngine(args, total_requests=total_requests)
     summaries = []
     request_idx_offset = 0
-    for sweep_idx, (qps, num_requests) in enumerate(zip(qps_values, request_counts)):
+    for qps, num_requests in zip(qps_values, request_counts):
         clients = benchmark.build_clients(args.concurrency)
         label = f"qps{qps:g}-{args.arrival}"
         arrival_plan = [

@@ -1,10 +1,16 @@
 import asyncio
+import mimetypes
 import time
 import typing as ty
 import urllib.parse
 import uuid
 
-from .constants import JsonDict
+import dataset as dataset_lib
+from metrics import RequestMetrics
+
+from .messages import decode_data_url, extract_first_image_url, iter_message_text
+
+JsonDict = ty.Dict[str, ty.Any]
 
 
 def split_http_url(url: str) -> ty.Tuple[str, int, str]:
@@ -133,3 +139,74 @@ def encode_multipart_form_data(
         body.extend(b"\r\n")
     body.extend(f"--{boundary}--\r\n".encode())
     return bytes(body), f"multipart/form-data; boundary={boundary}"
+
+
+class DiffusionClient:
+    def __init__(
+        self,
+        url: str,
+        timeout: float,
+        style: ty.Optional[str],
+        seed: ty.Optional[int],
+        steps: ty.Optional[int],
+        extra_fields: ty.Optional[JsonDict],
+    ) -> None:
+        self.http_client = AsyncMultipartHttpClient(url, timeout)
+        self.style = style
+        self.seed = seed
+        self.steps = steps
+        self.extra_fields = extra_fields or {}
+
+    async def send_request(
+        self,
+        req_idx: int,
+        request: dataset_lib.StdChatApiRequest,
+        sampling_params: ty.Optional[JsonDict] = None,
+    ) -> RequestMetrics:
+        del sampling_params
+        stime = time.perf_counter()
+        try:
+            messages = request["messages"]
+            image_url = extract_first_image_url(messages)
+            if image_url is None:
+                raise RuntimeError("DiffusionClient requires an image request.")
+            image_mime, image_bytes = decode_data_url(image_url)
+            ext = mimetypes.guess_extension(image_mime) or ".png"
+            data = {str(k): str(v) for k, v in self.extra_fields.items()}
+            prompt = "\n".join(iter_message_text(messages))
+            data["style"] = self.style or prompt or "摄影后期"
+            if self.seed is not None:
+                data["seed"] = str(self.seed + req_idx)
+            if self.steps is not None:
+                data["steps"] = str(self.steps)
+            files = {
+                "image": (
+                    f"request-{req_idx}{ext}",
+                    image_bytes,
+                    image_mime,
+                )
+            }
+            first_byte_ts, output = await self.http_client.post_multipart(data, files)
+            etime = time.perf_counter()
+            return RequestMetrics(
+                req_idx,
+                True,
+                first_byte_ts - stime,
+                etime - stime,
+                0,
+                len(output),
+                1,
+            )
+        except Exception as e:
+            etime = time.perf_counter()
+            return RequestMetrics(
+                req_idx,
+                False,
+                0.0,
+                etime - stime,
+                0,
+                0,
+                0,
+                (),
+                repr(e),
+            )

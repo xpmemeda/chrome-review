@@ -604,7 +604,7 @@ class BenchmarkEngine:
 
         async def send_one(
             client_idx: int,
-            request: dataset_lib.Request,
+            request: dataset_lib.StdChatApiRequest,
             semaphore: asyncio.Semaphore,
             req_idx: int,
         ) -> ty.Tuple[int, RequestMetrics]:
@@ -917,7 +917,7 @@ class BenchmarkEngine:
         self,
         label: str,
         client: ty.Any,
-        request: dataset_lib.Request,
+        request: dataset_lib.StdChatApiRequest,
         metric: RequestMetrics,
     ) -> None:
         if not self.detail_log_path:
@@ -946,7 +946,9 @@ class BenchmarkEngine:
         return datetime.datetime.now().astimezone().isoformat(timespec="milliseconds")
 
     @staticmethod
-    def _extract_first_image_size(request: dataset_lib.Request) -> ty.Optional[int]:
+    def _extract_first_image_size(
+        request: dataset_lib.StdChatApiRequest,
+    ) -> ty.Optional[int]:
         for message in request["messages"]:
             content = message.get("content")
             if not isinstance(content, list):
@@ -1000,7 +1002,7 @@ class BenchmarkEngine:
     async def _send_prebuilt_one(
         self,
         client: ty.Any,
-        request: dataset_lib.Request,
+        request: dataset_lib.StdChatApiRequest,
         semaphore: asyncio.Semaphore,
         req_idx: int,
         label: str,
@@ -1011,7 +1013,7 @@ class BenchmarkEngine:
     async def _send_request(
         self,
         client: ty.Any,
-        request: dataset_lib.Request,
+        request: dataset_lib.StdChatApiRequest,
         req_idx: int,
         label: str,
     ) -> RequestMetrics:

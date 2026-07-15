@@ -3,7 +3,6 @@ import typing as ty
 JsonDict = ty.Dict[str, ty.Any]
 Messages = ty.List[JsonDict]
 StdChatApiRequest = JsonDict
-Request = StdChatApiRequest
 
 
 class VlmDataset:

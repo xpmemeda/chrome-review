@@ -1,6 +1,11 @@
 import typing as ty
 
-from .constants import TokenCounter
+from token_counters import (
+    TiktokenTokenCounter,
+    TokenCounter,
+    TransformersTokenCounter,
+)
+
 
 _OUTPUT_TOKEN_COUNTER: ty.Optional[TokenCounter] = None
 
@@ -19,12 +24,4 @@ def get_output_token_counter() -> TokenCounter:
 
 
 def build_output_token_counter() -> TokenCounter:
-    try:
-        import tiktoken
-    except ImportError as e:
-        raise RuntimeError(
-            "Local output token counting requires the tiktoken Python package."
-        ) from e
-
-    encoding = tiktoken.get_encoding("o200k_base")
-    return lambda text, encoding=encoding: len(encoding.encode(text))
+    return TiktokenTokenCounter()

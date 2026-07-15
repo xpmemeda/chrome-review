@@ -2,10 +2,12 @@ import typing as ty
 
 import dataset as dataset_lib
 
-from .constants import JsonDict
+JsonDict = ty.Dict[str, ty.Any]
 
 
-def request_to_openai_messages(request: dataset_lib.Request) -> ty.List[JsonDict]:
+def request_to_openai_messages(
+    request: dataset_lib.StdChatApiRequest,
+) -> ty.List[JsonDict]:
     return list(request["messages"])
 
 
