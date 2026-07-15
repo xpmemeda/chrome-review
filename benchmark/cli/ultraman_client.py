@@ -1,6 +1,7 @@
 import asyncio
 import datetime
-import mimetypes
+import json
+import os
 import sys
 import time
 import typing as ty
@@ -10,340 +11,14 @@ import uuid
 import dataset as dataset_lib
 from metrics import RequestMetrics
 
-from .constants import (
-    JsonDict,
-    ULTRAMAN_DEFAULT_PORT,
-    ULTRAMAN_RESERVED_OUTPUT_TOKENS,
-)
-from .http import AsyncMultipartHttpClient
-from .messages import decode_data_url, extract_first_image_url, iter_message_text
-from .payloads import build_chat_payload, collect_chat_completion_stream
+from .messages import decode_data_url
 from .tokens import count_output_tokens
 
-
-class SdkChatClient:
-    def __init__(
-        self,
-        client: ty.Any,
-        model: str,
-        max_tokens: int,
-        min_tokens: ty.Optional[int],
-        temperature: float,
-        top_p: ty.Optional[float],
-        extra_body: ty.Optional[JsonDict],
-        include_usage: bool = True,
-    ) -> None:
-        self.client = client
-        self.model = model
-        self.max_tokens = max_tokens
-        self.min_tokens = min_tokens
-        self.temperature = temperature
-        self.top_p = top_p
-        self.extra_body = extra_body or {}
-        self.include_usage = include_usage
-
-    def build_payload(
-        self,
-        request: dataset_lib.Request,
-        sampling_params: ty.Optional[JsonDict] = None,
-    ) -> JsonDict:
-        return build_chat_payload(
-            model=self.model,
-            request=request,
-            max_tokens=self.max_tokens,
-            min_tokens=self.min_tokens,
-            temperature=self.temperature,
-            top_p=self.top_p,
-            extra_body=self.extra_body,
-            sampling_params=sampling_params,
-            include_usage=self.include_usage,
-        )
-
-    def build_extra_headers(self, req_idx: int) -> ty.Optional[JsonDict]:
-        del req_idx
-        return None
-
-    def _attach_extra_headers(
-        self,
-        metric: RequestMetrics,
-        extra_headers: ty.Optional[JsonDict],
-    ) -> RequestMetrics:
-        if not extra_headers:
-            return metric
-        x_tt_logid = extra_headers.get("x-tt-logid")
-        if not isinstance(x_tt_logid, str):
-            return metric
-        return metric._replace(x_tt_logid=x_tt_logid)
-
-    def _attach_client_send_timestamp(
-        self,
-        metric: RequestMetrics,
-        client_send_timestamp: ty.Optional[str],
-    ) -> RequestMetrics:
-        if client_send_timestamp is None:
-            return metric
-        return metric._replace(client_send_timestamp=client_send_timestamp)
-
-    async def send_request(
-        self,
-        req_idx: int,
-        request: dataset_lib.Request,
-        sampling_params: ty.Optional[JsonDict] = None,
-    ) -> RequestMetrics:
-        stime = time.perf_counter()
-        extra_headers = None
-        client_send_timestamp = None
-        try:
-            payload = self.build_payload(request, sampling_params)
-            extra_headers = self.build_extra_headers(req_idx)
-            if extra_headers:
-                payload["extra_headers"] = extra_headers
-            client_send_timestamp = datetime.datetime.now().astimezone().isoformat(
-                timespec="milliseconds"
-            )
-            stream = await self.client.chat.completions.create(**payload)
-            metric = await collect_chat_completion_stream(req_idx, stream, stime)
-            metric = self._attach_extra_headers(metric, extra_headers)
-            return self._attach_client_send_timestamp(metric, client_send_timestamp)
-        except Exception as e:
-            etime = time.perf_counter()
-            metric = self._attach_extra_headers(
-                RequestMetrics(
-                    req_idx,
-                    False,
-                    0.0,
-                    etime - stime,
-                    0,
-                    0,
-                    0,
-                    (),
-                    repr(e),
-                ),
-                extra_headers,
-            )
-            return self._attach_client_send_timestamp(metric, client_send_timestamp)
-
-
-class OpenAIClient(SdkChatClient):
-    def __init__(
-        self,
-        base_url: str,
-        api_key: str,
-        model: str,
-        timeout: float,
-        max_tokens: int,
-        min_tokens: ty.Optional[int],
-        temperature: float,
-        top_p: ty.Optional[float],
-        extra_body: ty.Optional[JsonDict],
-    ) -> None:
-        import openai
-
-        super().__init__(
-            client=openai.AsyncOpenAI(
-                base_url=base_url,
-                api_key=api_key,
-                timeout=timeout,
-                max_retries=0,
-            ),
-            model=model,
-            max_tokens=max_tokens,
-            min_tokens=min_tokens,
-            temperature=temperature,
-            top_p=top_p,
-            extra_body=extra_body,
-        )
-
-
-class ArkClient(SdkChatClient):
-    def __init__(
-        self,
-        base_url: str,
-        api_key: str,
-        model: str,
-        timeout: float,
-        max_tokens: int,
-        min_tokens: ty.Optional[int],
-        temperature: float,
-        top_p: ty.Optional[float],
-        extra_body: ty.Optional[JsonDict],
-    ) -> None:
-        if not api_key or api_key == "dummy" or not model:
-            raise RuntimeError("--api-key and --model are required for --client ark")
-
-        import httpx
-        import openai
-
-        super().__init__(
-            client=openai.AsyncOpenAI(
-                base_url=base_url,
-                api_key=api_key,
-                default_headers={
-                    "ark-thinking-summary": "skip-thinking-summary",
-                },
-                http_client=httpx.AsyncClient(trust_env=False, timeout=timeout),
-                max_retries=0,
-            ),
-            model=model,
-            max_tokens=max_tokens,
-            min_tokens=min_tokens,
-            temperature=temperature,
-            top_p=top_p,
-            extra_body=extra_body,
-            include_usage=False,
-        )
-
-    def build_payload(
-        self,
-        request: dataset_lib.Request,
-        sampling_params: ty.Optional[JsonDict] = None,
-    ) -> JsonDict:
-        payload = super().build_payload(request, sampling_params)
-        max_completion_tokens = payload.pop("max_tokens", self.max_tokens)
-        extra_body = dict(payload.get("extra_body") or {})
-        extra_body["max_completion_tokens"] = max_completion_tokens
-        payload["extra_body"] = extra_body
-        return payload
-
-
-class ModelApiClient(SdkChatClient):
-    def __init__(
-        self,
-        base_url: str,
-        env: str,
-        model: str,
-        timeout: float,
-        max_tokens: int,
-        min_tokens: ty.Optional[int],
-        temperature: float,
-        top_p: ty.Optional[float],
-        extra_body: ty.Optional[JsonDict],
-    ) -> None:
-        if not model:
-            raise RuntimeError("model can't be empty if using modelapi.")
-
-        import httpx
-        import openai
-
-        super().__init__(
-            client=openai.AsyncOpenAI(
-                base_url=base_url,
-                api_key="empty",
-                default_headers={
-                    "x-tt-env": env,
-                    "x-use-ppe": "1" if env else "0",
-                },
-                http_client=httpx.AsyncClient(trust_env=False, timeout=timeout),
-                max_retries=0,
-            ),
-            model=model,
-            max_tokens=max_tokens,
-            min_tokens=min_tokens,
-            temperature=temperature,
-            top_p=top_p,
-            extra_body=extra_body,
-        )
-        self.user = f"benchmark-modelapi-{uuid.uuid4().hex}"
-
-    def build_extra_headers(self, req_idx: int) -> JsonDict:
-        del req_idx
-        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-        return {"x-tt-logid": timestamp + uuid.uuid4().hex[:20].upper()}
-
-    def build_payload(
-        self,
-        request: dataset_lib.Request,
-        sampling_params: ty.Optional[JsonDict] = None,
-    ) -> JsonDict:
-        payload = super().build_payload(request, sampling_params)
-        max_completion_tokens = payload.pop("max_tokens", self.max_tokens)
-        extra_body = dict(payload.get("extra_body") or {})
-        extra_body["max_completion_tokens"] = max_completion_tokens
-        payload["extra_body"] = extra_body
-        payload["user"] = self.user
-        return payload
-
-
-class MockClient:
-    async def send_request(
-        self,
-        req_idx: int,
-        request: dataset_lib.Request,
-        sampling_params: ty.Optional[JsonDict] = None,
-    ) -> RequestMetrics:
-        del request, sampling_params
-        return RequestMetrics(req_idx, True, 0.0, 0.0, 0, 0, 0)
-
-
-class DiffusionClient:
-    def __init__(
-        self,
-        url: str,
-        timeout: float,
-        style: ty.Optional[str],
-        seed: ty.Optional[int],
-        steps: ty.Optional[int],
-        extra_fields: ty.Optional[JsonDict],
-    ) -> None:
-        self.http_client = AsyncMultipartHttpClient(url, timeout)
-        self.style = style
-        self.seed = seed
-        self.steps = steps
-        self.extra_fields = extra_fields or {}
-
-    async def send_request(
-        self,
-        req_idx: int,
-        request: dataset_lib.Request,
-        sampling_params: ty.Optional[JsonDict] = None,
-    ) -> RequestMetrics:
-        del sampling_params
-        stime = time.perf_counter()
-        try:
-            messages = request["messages"]
-            image_url = extract_first_image_url(messages)
-            if image_url is None:
-                raise RuntimeError("DiffusionClient requires an image request.")
-            image_mime, image_bytes = decode_data_url(image_url)
-            ext = mimetypes.guess_extension(image_mime) or ".png"
-            data = {str(k): str(v) for k, v in self.extra_fields.items()}
-            prompt = "\n".join(iter_message_text(messages))
-            data["style"] = self.style or prompt or "摄影后期"
-            if self.seed is not None:
-                data["seed"] = str(self.seed + req_idx)
-            if self.steps is not None:
-                data["steps"] = str(self.steps)
-            files = {
-                "image": (
-                    f"request-{req_idx}{ext}",
-                    image_bytes,
-                    image_mime,
-                )
-            }
-            first_byte_ts, output = await self.http_client.post_multipart(data, files)
-            etime = time.perf_counter()
-            return RequestMetrics(
-                req_idx,
-                True,
-                first_byte_ts - stime,
-                etime - stime,
-                0,
-                len(output),
-                1,
-            )
-        except Exception as e:
-            etime = time.perf_counter()
-            return RequestMetrics(
-                req_idx,
-                False,
-                0.0,
-                etime - stime,
-                0,
-                0,
-                0,
-                (),
-                repr(e),
-            )
+JsonDict = ty.Dict[str, ty.Any]
+ULTRAMAN_DEFAULT_HOST = "127.0.0.1"
+ULTRAMAN_DEFAULT_PORT = 50050
+ULTRAMAN_PROTO_PATH = os.path.dirname(os.path.dirname(__file__))
+ULTRAMAN_RESERVED_OUTPUT_TOKENS = 8
 
 
 def split_grpc_target(value: str) -> ty.Tuple[str, int]:
@@ -412,7 +87,7 @@ class UltramanClient:
     async def send_request(
         self,
         req_idx: int,
-        request: dataset_lib.Request,
+        request: dataset_lib.StdChatApiRequest,
         sampling_params: ty.Optional[JsonDict] = None,
     ) -> RequestMetrics:
         del sampling_params
@@ -441,14 +116,16 @@ class UltramanClient:
     def _send_request_sync(
         self,
         req_idx: int,
-        request: dataset_lib.Request,
+        request: dataset_lib.StdChatApiRequest,
         stime: float,
     ) -> RequestMetrics:
         grpc_request = self._build_request(req_idx, request)
         stream = self.stub.StreamingCall(grpc_request, timeout=self.timeout)
         return self._collect_stream(req_idx, stream, stime)
 
-    def _build_request(self, req_idx: int, request: dataset_lib.Request) -> ty.Any:
+    def _build_request(
+        self, req_idx: int, request: dataset_lib.StdChatApiRequest
+    ) -> ty.Any:
         grpc_request = self.ultraman_pb2.InferenceRequest()
         now = datetime.datetime.now()
         grpc_request.req_id = (
@@ -592,8 +269,6 @@ class UltramanClient:
         return getattr(content_node, "string_", "")
 
     def _response_to_raw_text(self, response: ty.Any) -> str:
-        import json
-
         raw = {
             "req_id": response.req_id,
             "model_name": response.model_name,

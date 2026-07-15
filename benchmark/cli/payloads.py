@@ -1,83 +1,11 @@
 import time
 import typing as ty
 
-import dataset as dataset_lib
 from metrics import RequestMetrics
 
-from .constants import JsonDict, SDK_CHAT_COMPLETION_KEYS
-from .messages import request_to_openai_messages
 from .tokens import count_output_tokens
 
-
-def build_chat_payload(
-    model: str,
-    request: dataset_lib.Request,
-    max_tokens: int,
-    min_tokens: ty.Optional[int],
-    temperature: float,
-    top_p: ty.Optional[float],
-    extra_body: JsonDict,
-    sampling_params: ty.Optional[JsonDict] = None,
-    include_usage: bool = True,
-) -> JsonDict:
-    payload, request_extra_body = split_sdk_payload_and_extra_body(request)
-    payload.update(
-        {
-            "model": model,
-            "messages": request_to_openai_messages(request),
-            "stream": True,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-        }
-    )
-    if include_usage:
-        payload["stream_options"] = {"include_usage": True}
-    if "tool_choice" in payload:
-        payload["tool_choice"] = normalize_tool_choice(payload["tool_choice"])
-    if top_p is not None:
-        payload["top_p"] = top_p
-    merged_extra_body = dict(request_extra_body)
-    merged_extra_body.update(extra_body)
-    if min_tokens is not None:
-        merged_extra_body["min_tokens"] = min_tokens
-    if sampling_params:
-        merged_extra_body.update(sampling_params.get("extra_body", {}))
-        payload.update({k: v for k, v in sampling_params.items() if k != "extra_body"})
-    if merged_extra_body:
-        payload["extra_body"] = merged_extra_body
-    return payload
-
-
-def normalize_tool_choice(tool_choice: ty.Any) -> ty.Any:
-    if not isinstance(tool_choice, dict):
-        return tool_choice
-    string_choice = tool_choice.get("String")
-    if isinstance(string_choice, str):
-        return string_choice
-    tool_function = tool_choice.get("ToolFunction")
-    if isinstance(tool_function, dict):
-        function_name = tool_function.get("name")
-        if isinstance(function_name, str):
-            return {"type": "function", "function": {"name": function_name}}
-    return tool_choice
-
-
-def split_sdk_payload_and_extra_body(request: JsonDict) -> ty.Tuple[JsonDict, JsonDict]:
-    payload = {}
-    extra_body = {}
-    for key, value in request.items():
-        if key == "extra_body":
-            if isinstance(value, dict):
-                extra_body.update(value)
-            else:
-                raise RuntimeError(
-                    "extra_body in dataset request must be a JSON object"
-                )
-        elif key in SDK_CHAT_COMPLETION_KEYS:
-            payload[key] = value
-        else:
-            extra_body[key] = value
-    return payload, extra_body
+JsonDict = ty.Dict[str, ty.Any]
 
 
 def get_usage_int(usage: ty.Any, key: str) -> ty.Optional[int]:

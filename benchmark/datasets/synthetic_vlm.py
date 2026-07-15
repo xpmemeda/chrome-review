@@ -27,7 +27,7 @@ class SyntheticVlmDataset(VlmDataset):
         prompt_prefix_hit_rate: float,
         image_width: int,
         image_height: int,
-        image_seed: int,
+        image_seed: ty.Optional[int],
     ) -> None:
         if (
             not num_requests
@@ -36,7 +36,7 @@ class SyntheticVlmDataset(VlmDataset):
             or not image_height
         ):
             raise RuntimeError("Please provide arguments for SyntheticVlmDataset.")
-        if not image_seed:
+        if image_seed is None:
             image_seed = random.randint(0, sys.maxsize)
         check_prompt_prefix_hit_rate(prompt_prefix_hit_rate)
 

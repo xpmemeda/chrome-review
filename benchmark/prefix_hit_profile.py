@@ -207,7 +207,7 @@ class PrefixHitProfiler:
         )
         logging.info(message)
 
-    def _tokenize(self, request: dataset_lib.Request) -> ty.List[int]:
+    def _tokenize(self, request: dataset_lib.StdChatApiRequest) -> ty.List[int]:
         text = json.dumps(
             self._profile_messages(request),
             separators=(",", ":"),
@@ -215,7 +215,9 @@ class PrefixHitProfiler:
         )
         return self.encoding.encode(text)
 
-    def _profile_messages(self, request: dataset_lib.Request) -> dataset_lib.Messages:
+    def _profile_messages(
+        self, request: dataset_lib.StdChatApiRequest
+    ) -> dataset_lib.Messages:
         return [self._profile_message(message) for message in request["messages"]]
 
     def _profile_message(self, message: dataset_lib.JsonDict) -> dataset_lib.JsonDict:
