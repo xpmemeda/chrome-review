@@ -17,6 +17,10 @@ _OMNI_PAYLOAD_EXCLUDE_KEYS = {
     "temperature",
     "top_p",
 }
+DEFAULT_OMNI_IMAGE_CACHE_PATH = (
+    "~/workspace/ocean/service_shell/benchmark/round1_image_base64_cache.json"
+)
+OMNI_IMAGE_NOISE_BYTES = 128
 
 
 def _deepcopy_json(value: ty.Any) -> ty.Any:
@@ -118,23 +122,18 @@ class OmniMultiMessageDataset(VlmDataset):
         self,
         num_requests: int,
         template_path: str,
-        image_cache_path: ty.Optional[str],
-        noise_bytes: int,
         seed: int,
     ) -> None:
         if num_requests <= 0:
             raise RuntimeError(
                 "num_requests must be positive for OmniMultiMessageDataset."
             )
-        if noise_bytes < 0:
-            raise RuntimeError("--omni-noise-bytes must be non-negative.")
 
         self.num_requests = num_requests
         self.template_path = os.path.expanduser(template_path)
-        self.noise_bytes = noise_bytes
         self.seed = seed
         self.body_template = self._load_template(self.template_path)
-        self.image_cache = _load_image_cache(image_cache_path)
+        self.image_cache = _load_image_cache(DEFAULT_OMNI_IMAGE_CACHE_PATH)
         logging.info(
             "loaded omni multi-message dataset, template=%s requests=%d image_cache=%d",
             self.template_path,
@@ -239,6 +238,10 @@ class OmniMultiMessageDataset(VlmDataset):
             if not isinstance(url, str) or url not in self.image_cache:
                 continue
             data_url = self.image_cache[url]
-            if last_image_loc == (message_idx, part_idx) and self.noise_bytes:
-                data_url = _add_noise_to_data_url(data_url, self.noise_bytes, rng)
+            if last_image_loc == (message_idx, part_idx):
+                data_url = _add_noise_to_data_url(
+                    data_url,
+                    OMNI_IMAGE_NOISE_BYTES,
+                    rng,
+                )
             image_url["url"] = data_url

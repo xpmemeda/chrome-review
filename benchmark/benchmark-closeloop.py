@@ -4,39 +4,45 @@ import logging
 import shlex
 import sys
 
+import cmdargs
 import engine
 
 
 def build_parser():
-    parser = engine.build_base_parser(
+    parser = cmdargs.build_base_parser(
         include_concurrency=False,
         include_num_requests=False,
     )
     parser.add_argument(
         "--concurrency-sweep",
+        type=int,
+        nargs="+",
         required=True,
-        help="comma list/ranges, e.g. 1,2,4,8,16 or 1:16:2",
+        help="one or more global in-flight concurrency values, e.g. 1 2 4 8 16",
     )
     parser.add_argument(
         "--num-requests-sweep",
+        type=int,
+        nargs="+",
         required=True,
         help=(
-            "Requests per concurrency point. A single value is broadcast to all "
-            "points; lists/ranges must match --concurrency-sweep length."
+            "Requests per concurrency point. Values must match "
+            "--concurrency-sweep length."
         ),
     )
     return parser
 
 
 async def async_main(args):
-    concurrencies = [
-        int(x)
-        for x in engine.parse_number_list(args.concurrency_sweep, 1, int, "concurrency")
-    ]
-    request_counts = engine.parse_request_count_sweep(
-        args.num_requests_sweep,
-        len(concurrencies),
-    )
+    concurrencies = args.concurrency_sweep
+    request_counts = args.num_requests_sweep
+    if len(request_counts) != len(concurrencies):
+        raise ValueError(
+            "--num-requests-sweep length must match --concurrency-sweep length: "
+            f"{len(request_counts)} != {len(concurrencies)}"
+        )
+    if any(num_requests <= 0 for num_requests in request_counts):
+        raise ValueError("--num-requests-sweep values must be positive")
     total_requests = sum(request_counts)
     benchmark = engine.BenchmarkEngine(args, total_requests=total_requests)
     summaries = []
