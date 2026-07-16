@@ -6,6 +6,7 @@ import shlex
 import sys
 
 import arrival as arrival_lib
+import cmdargs
 import engine
 
 
@@ -20,7 +21,7 @@ def build_arrival_planner(args, qps):
 
 
 def build_parser():
-    parser = engine.build_base_parser(include_num_requests=False)
+    parser = cmdargs.build_base_parser(include_num_requests=False)
     parser.add_argument(
         "--arrival",
         choices=["poisson", "constant"],
@@ -29,15 +30,18 @@ def build_parser():
     )
     parser.add_argument(
         "--qps-sweep",
+        type=float,
+        nargs="+",
         required=True,
-        help="comma list/ranges, e.g. 8 or 1,2,4,8 or 1:8:1",
+        help="one or more global QPS values, e.g. 8 or 1 2 4 8",
     )
     parser.add_argument(
         "--num-requests-sweep",
+        type=int,
+        nargs="+",
         required=True,
         help=(
-            "Requests per QPS point. A single value is broadcast to all points; "
-            "lists/ranges must match --qps-sweep length."
+            "Requests per QPS point. Values must match --qps-sweep length."
         ),
     )
     parser.add_argument("--arrival-seed", type=int, default=0)
@@ -76,13 +80,15 @@ def log_arrival_plan(label, target_qps, arrival_plan):
 
 
 async def async_main(args: argparse.Namespace):
-    qps_values = [
-        float(x) for x in engine.parse_number_list(args.qps_sweep, 1.0, float, "qps")
-    ]
-    request_counts = engine.parse_request_count_sweep(
-        args.num_requests_sweep,
-        len(qps_values),
-    )
+    qps_values = args.qps_sweep
+    request_counts = args.num_requests_sweep
+    if len(request_counts) != len(qps_values):
+        raise ValueError(
+            "--num-requests-sweep length must match --qps-sweep length: "
+            f"{len(request_counts)} != {len(qps_values)}"
+        )
+    if any(num_requests <= 0 for num_requests in request_counts):
+        raise ValueError("--num-requests-sweep values must be positive")
 
     total_requests = sum(request_counts)
     benchmark = engine.BenchmarkEngine(args, total_requests=total_requests)
