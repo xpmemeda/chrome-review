@@ -2,10 +2,10 @@ import json
 import logging
 import typing as ty
 
-from .base import Messages, StdChatApiRequest, VlmDataset
+from .base import Dataset, Messages, StdChatApiRequest
 
 
-class JsonlTextDataset(VlmDataset):
+class JsonlTextDataset(Dataset):
     def __init__(self, dataset_path: str) -> None:
         self.dataset = self._load(dataset_path)
         if not self.dataset:

@@ -5,7 +5,7 @@ Messages = ty.List[JsonDict]
 StdChatApiRequest = JsonDict
 
 
-class VlmDataset:
+class Dataset:
     def get(self, req_idx: int) -> StdChatApiRequest:
         raise NotImplementedError()
 

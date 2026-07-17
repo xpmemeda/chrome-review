@@ -6,7 +6,7 @@ import typing as ty
 
 import tqdm
 
-from .base import StdChatApiRequest, VlmDataset
+from .base import Dataset, StdChatApiRequest
 from .synthetic_utils import (
     check_prompt_prefix_hit_rate,
     encode_png_rgb,
@@ -19,7 +19,7 @@ from .synthetic_utils import (
 IMAGE_TARGET_KIB = 32
 
 
-class SyntheticVlmDataset(VlmDataset):
+class SyntheticVlmDataset(Dataset):
     def __init__(
         self,
         num_requests: int,

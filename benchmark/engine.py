@@ -165,24 +165,24 @@ class BenchmarkEngine:
 
     def _build_dataset(
         self, total_requests: ty.Optional[int]
-    ) -> dataset_lib.VlmDataset:
+    ) -> dataset_lib.Dataset:
         args = self.args
         if args.dataset == "synthetic-vlm":
             dataset = dataset_lib.SyntheticVlmDataset(
                 num_requests=total_requests
                 or (args.warmup_requests + args.num_requests),
-                num_prompt_tokens=args.num_prompt_tokens,
-                prompt_prefix_hit_rate=args.prompt_prefix_hit_rate,
-                image_width=args.image_width,
-                image_height=args.image_height,
-                image_seed=args.image_seed,
+                num_prompt_tokens=args.synthetic_vlm_num_prompt_tokens,
+                prompt_prefix_hit_rate=args.synthetic_vlm_prompt_prefix_hit_rate,
+                image_width=args.synthetic_vlm_image_width,
+                image_height=args.synthetic_vlm_image_height,
+                image_seed=args.synthetic_vlm_image_seed,
             )
         elif args.dataset == "synthetic-txt":
             dataset = dataset_lib.SyntheticTextDataset(
                 num_requests=total_requests
                 or (args.warmup_requests + args.num_requests),
-                num_prompt_tokens=args.num_prompt_tokens,
-                prompt_prefix_hit_rate=args.prompt_prefix_hit_rate,
+                num_prompt_tokens=args.synthetic_txt_num_prompt_tokens,
+                prompt_prefix_hit_rate=args.synthetic_txt_prompt_prefix_hit_rate,
                 seed=args.text_seed,
             )
         elif args.dataset == "jsonl":
@@ -663,16 +663,24 @@ class BenchmarkEngine:
         if not self.detail_log_path:
             return
         del label, client
-        item = {
-            "client_send_timestamp": metric.client_send_timestamp,
-            "x-tt-logid": metric.x_tt_logid,
-            "response_id": self._extract_first_response_id(metric),
-            "image_bytes": self._extract_first_image_size(request),
-            "ttft": round(metric.ttft, 3),
-            "tpot": self._calculate_metric_tpot(metric),
-        }
+        item = [
+            ("client_send_timestamp", json.dumps(metric.client_send_timestamp)),
+            ("x-tt-logid", json.dumps(metric.x_tt_logid)),
+            ("response_id", json.dumps(self._extract_first_response_id(metric))),
+            ("image_bytes", json.dumps(self._extract_first_image_size(request))),
+            ("ttft", f"{metric.ttft:.3f}"),
+            ("tpot", self._format_detail_float(self._calculate_metric_tpot(metric))),
+            ("output_text", json.dumps(metric.output_text, ensure_ascii=False)),
+        ]
+        line = "{" + ", ".join(f'"{key}": {value}' for key, value in item) + "}"
         with open(self.detail_log_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(item, ensure_ascii=False) + "\n")
+            f.write(line + "\n")
+
+    @staticmethod
+    def _format_detail_float(value: ty.Optional[float]) -> str:
+        if value is None:
+            return "null"
+        return f"{value:.3f}"
 
     @staticmethod
     def _calculate_metric_tpot(metric: RequestMetrics) -> ty.Optional[float]:
