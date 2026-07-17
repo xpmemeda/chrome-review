@@ -170,7 +170,7 @@ class PrefixHitProfiler:
     IMAGE_PLACEHOLDER = "<image>"
 
     def __init__(
-        self, dataset: dataset_lib.VlmDataset, encoding_name: str = "o200k_base"
+        self, dataset: dataset_lib.Dataset, encoding_name: str = "o200k_base"
     ) -> None:
         try:
             import tiktoken

@@ -3,7 +3,7 @@ import typing as ty
 
 import tqdm
 
-from .base import StdChatApiRequest, VlmDataset
+from .base import Dataset, StdChatApiRequest
 from .synthetic_utils import (
     check_prompt_prefix_hit_rate,
     make_synthetic_prompt,
@@ -11,7 +11,7 @@ from .synthetic_utils import (
 )
 
 
-class SyntheticTextDataset(VlmDataset):
+class SyntheticTextDataset(Dataset):
     def __init__(
         self,
         num_requests: int,

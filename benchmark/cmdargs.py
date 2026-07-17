@@ -44,16 +44,29 @@ def build_base_parser(
         "-l", "--log-path", help="Optional log file path.", default="benchmark.log"
     )
 
-    parser.add_argument("--num-prompt-tokens", type=int, default=None)
+    parser.add_argument("--synthetic-txt-num-prompt-tokens", type=int, default=None)
     parser.add_argument(
-        "--prompt-prefix-hit-rate",
+        "--synthetic-txt-prompt-prefix-hit-rate",
         type=float,
         default=0.0,
-        help="Fraction of synthetic prompt tokens shared before the per-request suffix.",
+        help=(
+            "Fraction of synthetic text prompt tokens shared before the "
+            "per-request suffix."
+        ),
     )
-    parser.add_argument("--image-width", type=int, default=None)
-    parser.add_argument("--image-height", type=int, default=None)
-    parser.add_argument("--image-seed", type=int, default=None)
+    parser.add_argument("--synthetic-vlm-num-prompt-tokens", type=int, default=None)
+    parser.add_argument(
+        "--synthetic-vlm-prompt-prefix-hit-rate",
+        type=float,
+        default=0.0,
+        help=(
+            "Fraction of synthetic VLM prompt tokens shared before the "
+            "per-request suffix."
+        ),
+    )
+    parser.add_argument("--synthetic-vlm-image-width", type=int, default=None)
+    parser.add_argument("--synthetic-vlm-image-height", type=int, default=None)
+    parser.add_argument("--synthetic-vlm-image-seed", type=int, default=None)
     parser.add_argument(
         "--text-seed",
         type=int,

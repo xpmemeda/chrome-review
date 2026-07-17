@@ -65,7 +65,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=0.0,
         help="Seconds to sleep after round 1 only.",
     )
-    parser.add_argument("--system-prompt", default="")
+    parser.add_argument("--system-prompt", default="hi " * 4000)
     parser.add_argument("--timeout", type=float, default=600.0)
     parser.add_argument("--max-tokens", type=int, default=64)
     parser.add_argument("--min-tokens", type=int)
@@ -152,6 +152,7 @@ async def run_once(
         messages.append(user_message)
         request = {"messages": list(messages)}
 
+        # 这个 while True 是为了确保这轮请求成功返回，如果失败则重试，直到成功为止。
         attempt = 0
         while True:
             attempt += 1

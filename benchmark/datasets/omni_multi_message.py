@@ -6,17 +6,9 @@ import random
 import re
 import typing as ty
 
-from .base import JsonDict, Messages, StdChatApiRequest, VlmDataset
+from .base import Dataset, JsonDict, Messages, StdChatApiRequest
 
 _APP_LIST_RE = re.compile(r"(The available app list is:\s*)\[(.*?)]", re.DOTALL)
-_OMNI_PAYLOAD_EXCLUDE_KEYS = {
-    "messages",
-    "stream",
-    "model",
-    "max_tokens",
-    "temperature",
-    "top_p",
-}
 DEFAULT_OMNI_IMAGE_CACHE_PATH = (
     "~/workspace/ocean/service_shell/benchmark/round1_image_base64_cache.json"
 )
@@ -117,7 +109,7 @@ def _extract_prompt_text(messages: Messages) -> str:
     return "\n".join(parts)
 
 
-class OmniMultiMessageDataset(VlmDataset):
+class OmniMultiMessageDataset(Dataset):
     def __init__(
         self,
         num_requests: int,
@@ -150,6 +142,12 @@ class OmniMultiMessageDataset(VlmDataset):
             raise RuntimeError(
                 f"omni template must contain a messages list: {template_path}"
             )
+        ignored_keys = sorted(key for key in body if key != "messages")
+        if ignored_keys:
+            logging.warning(
+                "omni multi-message dataset only uses messages; ignored template fields: %s",
+                ", ".join(ignored_keys),
+            )
         return body
 
     def get(self, req_idx: int) -> StdChatApiRequest:
@@ -165,23 +163,9 @@ class OmniMultiMessageDataset(VlmDataset):
         rng_seed = self.seed - 100000000 if warmup else self.seed
         rng = random.Random(rng_seed + req_idx)
         body = _deepcopy_json(self.body_template)
-        body["stream"] = True
-        body["user"] = self._make_user(req_idx, warmup, rng)
         messages = body["messages"]
         self._mutate_messages(messages, rng)
-
-        request = {
-            key: value
-            for key, value in body.items()
-            if key not in _OMNI_PAYLOAD_EXCLUDE_KEYS
-        }
-        request["messages"] = messages
-        return request
-
-    def _make_user(self, req_idx: int, warmup: bool, rng: random.Random) -> str:
-        prefix = "warmup" if warmup else "req"
-        suffix = "".join(rng.choices("abcdefghijklmnopqrstuvwxyz0123456789", k=8))
-        return f"{prefix}_{req_idx}_{suffix}"
+        return {"messages": messages}
 
     def _mutate_messages(self, messages: Messages, rng: random.Random) -> None:
         user_indices = [

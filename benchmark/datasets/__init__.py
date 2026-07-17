@@ -1,4 +1,4 @@
-from .base import JsonDict, Messages, StdChatApiRequest, VlmDataset
+from .base import Dataset, JsonDict, Messages, StdChatApiRequest
 from .jsonl import JsonlTextDataset
 from .omni_multi_message import OmniMultiMessageDataset
 from .synthetic_text import SyntheticTextDataset
@@ -24,7 +24,7 @@ __all__ = [
     "StdChatApiRequest",
     "SyntheticTextDataset",
     "SyntheticVlmDataset",
-    "VlmDataset",
+    "Dataset",
     "BYTES_PER_KIB",
     "PNG_MAX_CHUNK_DATA_SIZE",
     "check_prompt_prefix_hit_rate",
