@@ -19,6 +19,7 @@ LOG_FORMAT = "%(asctime)s.%(msecs)03d - %(levelname)s - %(message)s"
 LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 SUCCESS_LEVEL = 25
 WARMUP_MAX_ATTEMPTS = 3
+WARMUP_MAX_TOKENS = 1
 logging.addLevelName(SUCCESS_LEVEL, "SUCCESS")
 
 
@@ -354,6 +355,10 @@ class BenchmarkEngine:
                 semaphore,
                 req_idx,
                 detail_label,
+                sampling_params={
+                    "max_tokens": WARMUP_MAX_TOKENS,
+                    "extra_body": {"min_tokens": WARMUP_MAX_TOKENS},
+                },
             )
             return client_idx, metric
 
@@ -754,9 +759,16 @@ class BenchmarkEngine:
         semaphore: asyncio.Semaphore,
         req_idx: int,
         label: str,
+        sampling_params: ty.Optional[JsonDict] = None,
     ) -> RequestMetrics:
         async with semaphore:
-            return await self._send_request(client, request, req_idx, label)
+            return await self._send_request(
+                client,
+                request,
+                req_idx,
+                label,
+                sampling_params,
+            )
 
     async def _send_request(
         self,
@@ -764,9 +776,10 @@ class BenchmarkEngine:
         request: dataset_lib.StdChatApiRequest,
         req_idx: int,
         label: str,
+        sampling_params: ty.Optional[JsonDict] = None,
     ) -> RequestMetrics:
         client_send_timestamp = self._now_timestamp()
-        metric = await client.send_request(req_idx, request)
+        metric = await client.send_request(req_idx, request, sampling_params)
         if metric.client_send_timestamp is None:
             metric = metric._replace(client_send_timestamp=client_send_timestamp)
         self._write_detail_log(label, client, request, metric)

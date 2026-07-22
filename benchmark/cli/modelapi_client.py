@@ -1,4 +1,5 @@
 import datetime
+import logging
 import typing as ty
 import uuid
 
@@ -9,6 +10,7 @@ from .sdk_chat import SdkChatClient
 
 JsonDict = ty.Dict[str, ty.Any]
 MODELAPI_BASE_URL = "https://device-intelligence.bytedance.net/api/v1"
+MODELAPI_RESERVED_OUTPUT_TOKENS = 8
 
 
 class ModelApiClient(SdkChatClient):
@@ -26,6 +28,20 @@ class ModelApiClient(SdkChatClient):
     ) -> None:
         if not model:
             raise RuntimeError("model can't be empty if using modelapi.")
+        compensated_max_tokens = max_tokens + MODELAPI_RESERVED_OUTPUT_TOKENS
+        compensated_min_tokens = (
+            None
+            if min_tokens is None
+            else min_tokens + MODELAPI_RESERVED_OUTPUT_TOKENS
+        )
+        logging.warning(
+            "ModelApi server reserves %d output tokens; sending max_tokens=%d "
+            "and min_tokens=%s after +%d compensation.",
+            MODELAPI_RESERVED_OUTPUT_TOKENS,
+            compensated_max_tokens,
+            "N/A" if compensated_min_tokens is None else compensated_min_tokens,
+            MODELAPI_RESERVED_OUTPUT_TOKENS,
+        )
 
         import httpx
         import openai
@@ -69,7 +85,11 @@ class ModelApiClient(SdkChatClient):
         temperature = request_options.pop("temperature", self.temperature)
         stream = request_options.pop("stream", True)
         extra_body = dict(request_options.get("extra_body") or {})
-        extra_body["max_completion_tokens"] = max_tokens
+        if isinstance(extra_body.get("min_tokens"), int):
+            extra_body["min_tokens"] += MODELAPI_RESERVED_OUTPUT_TOKENS
+        extra_body["max_completion_tokens"] = (
+            max_tokens + MODELAPI_RESERVED_OUTPUT_TOKENS
+        )
         request_options["extra_body"] = extra_body
         request_options["user"] = self.user
         return await self.client.chat.completions.create(

@@ -3,6 +3,7 @@ from .diffusion_client import DiffusionClient
 from .mock_client import MockClient
 from .modelapi_client import (
     MODELAPI_BASE_URL,
+    MODELAPI_RESERVED_OUTPUT_TOKENS,
     ModelApiClient,
 )
 from .openai_client import OpenAIClient
@@ -41,6 +42,7 @@ from .tokens import (
 __all__ = [
     "ARK_BASE_URL",
     "MODELAPI_BASE_URL",
+    "MODELAPI_RESERVED_OUTPUT_TOKENS",
     "ULTRAMAN_DEFAULT_HOST",
     "ULTRAMAN_DEFAULT_PORT",
     "ULTRAMAN_PROTO_PATH",

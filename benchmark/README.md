@@ -62,7 +62,7 @@ python3 benchmark/benchmark-closeloop.py \
 - `--arrival`：全局请求到达过程，可选 `poisson` 或 `constant`。
 - `--qps-sweep`：服务端整体请求到达率，支持单个 QPS 或多个 QPS 点。
 - `--arrival-seed`：生成 Poisson 到达计划的随机种子；Poisson 时间戳会后验缩放到目标整体 QPS。
-- `-c, --concurrency`：客户端侧最大 in-flight 请求数保护。
+- `-c, --concurrency`：客户端侧最大 in-flight 请求数保护，开环测试必须显式填写。
 - `--num-requests-sweep`：每个 QPS 点统计多少个请求，需要和 `--qps-sweep` 等长。
 - `-w, --warmup-requests`：每个 QPS 点正式统计前的预热请求数。
 - 开环 warmup 会按当前 `--qps-sweep` 点的 QPS 间隔逐个启动请求，避免 client 很多时形成 burst。

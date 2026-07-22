@@ -21,7 +21,10 @@ def build_arrival_planner(args, qps):
 
 
 def build_parser():
-    parser = cmdargs.build_base_parser(include_num_requests=False)
+    parser = cmdargs.build_base_parser(
+        include_num_requests=False,
+        require_concurrency=True,
+    )
     parser.add_argument(
         "--arrival",
         choices=["poisson", "constant"],

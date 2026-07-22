@@ -5,6 +5,7 @@ import cli
 def build_base_parser(
     include_concurrency: bool = True,
     include_num_requests: bool = True,
+    require_concurrency: bool = False,
 ) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(allow_abbrev=False)
 
@@ -29,7 +30,13 @@ def build_base_parser(
     if include_num_requests:
         parser.add_argument("-n", "--num-requests", type=int, default=100)
     if include_concurrency:
-        parser.add_argument("-c", "--concurrency", type=int, default=8)
+        parser.add_argument(
+            "-c",
+            "--concurrency",
+            type=int,
+            required=require_concurrency,
+            default=None if require_concurrency else 8,
+        )
     parser.add_argument("-w", "--warmup-requests", type=int, default=1)
     parser.add_argument(
         "--progress-interval",
