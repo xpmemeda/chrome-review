@@ -1,10 +1,10 @@
 import os
 import argparse
 import math
+import re
 from collections import defaultdict
 
 from safetensors.torch import safe_open
-
 
 QUANT_META_MARKERS = (
     ".input_scale",
@@ -40,6 +40,13 @@ def print_table(headers, rows):
 
 def shape_text(shape):
     return "x".join(str(dim) for dim in shape)
+
+
+def natural_sort_key(text):
+    return tuple(
+        (1, int(part)) if part.isdigit() else (0, part)
+        for part in re.split(r"(\d+)", text)
+    )
 
 
 def element_count(shape):
@@ -145,7 +152,13 @@ def main(cmd_arguments):
 
     rows = [
         (tensor["file"], tensor["key"], shape_text(tensor["shape"]), tensor["dtype"])
-        for tensor in sorted(tensors, key=lambda item: (item["file"], item["key"]))
+        for tensor in sorted(
+            tensors,
+            key=lambda item: (
+                natural_sort_key(item["key"]),
+                natural_sort_key(item["file"]),
+            ),
+        )
     ]
     print_table(("file", "key", "shape", "dtype"), rows)
     print_summary(tensors, cmd_arguments.include_quant_meta)
