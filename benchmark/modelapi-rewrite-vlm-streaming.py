@@ -63,34 +63,9 @@ class RandomImageGenerator:
             rows[offset + 2] = rng.randrange(256)
 
 
-class HistoryImagePruner:
-    def __init__(self, max_images: int = MAX_HISTORY_IMAGES) -> None:
-        self.max_images = max_images
-
-    def prune(self, messages: ty.List[JsonDict]) -> int:
-        image_locs = self._image_locs(messages)
-        num_to_remove = max(0, len(image_locs) - self.max_images)
-        for message_idx, part_idx in reversed(image_locs[:num_to_remove]):
-            content = messages[message_idx].get("content")
-            if isinstance(content, list):
-                del content[part_idx]
-        return num_to_remove
-
-    def _image_locs(self, messages: ty.List[JsonDict]) -> ty.List[ty.Tuple[int, int]]:
-        result = []
-        for message_idx, message in enumerate(messages):
-            content = message.get("content")
-            if not isinstance(content, list):
-                continue
-            for part_idx, part in enumerate(content):
-                if isinstance(part, dict) and part.get("type") == "image_url":
-                    result.append((message_idx, part_idx))
-        return result
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Temporary ModelApi append-history VLM chat CLI.",
+        description="Temporary ModelApi rewrite-history VLM chat CLI.",
         allow_abbrev=False,
     )
     parser.add_argument("--base-url", default=cli.MODELAPI_BASE_URL)
@@ -123,7 +98,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--prompt",
         default="seed={seed} client={client} iteration={iteration} round={round}，继续。",
         help=(
-            "User message prefix appended each round. Supports {round}, {seed}, "
+            "User message metadata template. Supports {round}, {seed}, "
             "{client}, and {iteration}."
         ),
     )
@@ -143,12 +118,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fraction of first-round text tokens placed in the shared system prefix.",
     )
     parser.add_argument(
+        "--rewrite-tokens",
         "--hi-per-round",
-        "--append-hi-tokens",
-        dest="hi_per_round",
+        dest="rewrite_tokens",
         type=int,
         default=4000,
-        help="Number of 'hi' tokens appended to each later round's user message.",
+        help="Number of 'hi' tokens in the rewritten tail user text.",
     )
     parser.add_argument(
         "--sleep-seconds",
@@ -176,7 +151,7 @@ def build_parser() -> argparse.ArgumentParser:
         "-l",
         "--log-path",
         help="Optional log file path.",
-        default="modelapi-append-vlm-streaming.log",
+        default="modelapi-rewrite-vlm-streaming.log",
     )
     return parser
 
@@ -221,17 +196,17 @@ def make_system_prompt(prefix_tokens: int) -> str:
     return " ".join([PROMPT_FILLER] * prefix_tokens)
 
 
-def make_user_message(
-    prompt: str,
-    image_url: str,
-) -> JsonDict:
+def make_image_message(image_url: str) -> JsonDict:
     return {
         "role": "user",
         "content": [
-            {"type": "text", "text": prompt},
             {"type": "image_url", "image_url": {"url": image_url, "detail": "low"}},
         ],
     }
+
+
+def make_text_message(prompt: str) -> JsonDict:
+    return {"role": "user", "content": prompt}
 
 
 def append_jsonl(path: ty.Optional[str], record: JsonDict) -> None:
@@ -245,46 +220,59 @@ async def run_once(
     args: argparse.Namespace,
     modelapi_client: cli.ModelApiClient,
     image_generator: RandomImageGenerator,
-    image_pruner: HistoryImagePruner,
     client_idx: int,
     iteration_idx: int,
     seed: int,
 ) -> None:
-    messages: ty.List[JsonDict] = []
     prefix_tokens = int(args.num_prompt_tokens * args.prompt_prefix_hit_rate)
     suffix_tokens = args.num_prompt_tokens - prefix_tokens
+    fixed_user_tokens = suffix_tokens - args.rewrite_tokens
+    base_messages: ty.List[JsonDict] = []
     system_prompt = make_system_prompt(prefix_tokens)
     if system_prompt:
-        messages.append({"role": "system", "content": system_prompt})
+        base_messages.append({"role": "system", "content": system_prompt})
+    fixed_user_prompt = format_prompt(
+        args.prompt,
+        0,
+        fixed_user_tokens,
+        client_idx,
+        iteration_idx,
+        seed,
+    )
+    base_messages.append({"role": "user", "content": fixed_user_prompt})
+    image_messages: ty.List[JsonDict] = []
 
     for round_idx in range(args.rounds):
-        prompt_tokens = suffix_tokens if round_idx == 0 else args.hi_per_round
-        prompt = format_prompt(
+        tail_prompt = format_prompt(
             args.prompt,
             round_idx,
-            prompt_tokens,
+            args.rewrite_tokens,
             client_idx,
             iteration_idx,
             seed,
         )
-        user_message = make_user_message(prompt, image_generator.get(seed, round_idx))
-        messages.append(user_message)
-        pruned_images = image_pruner.prune(messages)
-        request = {"messages": list(messages)}
+        image_messages.append(make_image_message(image_generator.get(seed, round_idx)))
+        pruned_images = max(0, len(image_messages) - MAX_HISTORY_IMAGES)
+        if pruned_images:
+            image_messages = image_messages[pruned_images:]
+        tail_text_message = make_text_message(tail_prompt)
+        request_messages = base_messages + image_messages + [tail_text_message]
+        request = {"messages": request_messages}
 
         attempt = 0
         while True:
             attempt += 1
             logging.info(
                 "[client %d iteration %d seed %d round %d/%d attempt %d] "
-                "sending request, messages=%d pruned_images=%d",
+                "sending rewrite request, messages=%d images=%d pruned_images=%d",
                 client_idx,
                 iteration_idx,
                 seed,
                 round_idx + 1,
                 args.rounds,
                 attempt,
-                len(messages),
+                len(request_messages),
+                len(image_messages),
                 pruned_images,
             )
             metric = await modelapi_client.send_request(round_idx, request)
@@ -310,16 +298,15 @@ async def run_once(
                     "round": round_idx + 1,
                     "attempt": attempt,
                     "ok": False,
+                    "images": len(image_messages),
                     "pruned_images": pruned_images,
-                    "messages": messages,
+                    "messages": request_messages,
                     "error": metric.error,
                     "e2e": metric.e2e,
                 },
             )
             await asyncio.sleep(1.0)
 
-        assistant_message = {"role": "assistant", "content": metric.output_text}
-        messages.append(assistant_message)
         append_jsonl(
             args.jsonl,
             {
@@ -328,8 +315,9 @@ async def run_once(
                 "seed": seed,
                 "round": round_idx + 1,
                 "ok": True,
+                "images": len(image_messages),
                 "pruned_images": pruned_images,
-                "messages": messages,
+                "messages": request_messages,
                 "assistant": metric.output_text,
                 "ttft": metric.ttft,
                 "e2e": metric.e2e,
@@ -389,7 +377,6 @@ async def worker(
 ) -> None:
     modelapi_client = build_client(args)
     image_generator = RandomImageGenerator()
-    image_pruner = HistoryImagePruner()
     client_idx = process_idx * args.concurrency_per_process + local_client_idx
     total_clients = args.process * args.concurrency_per_process
     for iteration_idx in range(args.iterations):
@@ -408,7 +395,6 @@ async def worker(
             args,
             modelapi_client,
             image_generator,
-            image_pruner,
             client_idx,
             iteration_idx,
             seed,
@@ -433,10 +419,16 @@ def validate_args(args: argparse.Namespace) -> None:
         raise RuntimeError("--iterations must be positive")
     if args.num_prompt_tokens <= 0:
         raise RuntimeError("--num-prompt-tokens must be positive")
-    if args.hi_per_round < 0:
-        raise RuntimeError("--hi-per-round must be non-negative")
+    if args.rewrite_tokens < 0:
+        raise RuntimeError("--rewrite-tokens must be non-negative")
     if args.prompt_prefix_hit_rate < 0.0 or args.prompt_prefix_hit_rate > 1.0:
         raise RuntimeError("--prompt-prefix-hit-rate must be in [0, 1]")
+    prefix_tokens = int(args.num_prompt_tokens * args.prompt_prefix_hit_rate)
+    suffix_tokens = args.num_prompt_tokens - prefix_tokens
+    if args.rewrite_tokens > suffix_tokens:
+        raise RuntimeError(
+            "--rewrite-tokens must be no larger than the first-round suffix tokens"
+        )
     if args.sleep_seconds < 0.0:
         raise RuntimeError("--sleep-seconds must be non-negative")
     if args.sleep_after_first_round_seconds < 0.0:
@@ -462,7 +454,7 @@ def main() -> None:
     engine.configure_logger(args.log_path)
     logging.info("command: %s", shlex.join(sys.argv))
     logging.info(
-        "starting append VLM streaming test: processes=%d "
+        "starting rewrite VLM streaming test: processes=%d "
         "concurrency_per_process=%d total_clients=%d",
         args.process,
         args.concurrency_per_process,

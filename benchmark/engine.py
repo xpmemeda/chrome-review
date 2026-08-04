@@ -306,6 +306,8 @@ class BenchmarkEngine:
         verbose: bool = True,
         request_interval: ty.Optional[float] = None,
     ) -> ty.Optional[JsonDict]:
+        if not num_warmup_requests:
+            return None
         if num_warmup_requests < len(clients):
             logging.warning(
                 "[%s] warmup requests=%d is smaller than clients=%d; "
@@ -316,8 +318,6 @@ class BenchmarkEngine:
                 len(clients),
             )
             num_warmup_requests = len(clients)
-        if not num_warmup_requests:
-            return None
         if verbose:
             if request_interval is None:
                 logging.info(
