@@ -1,0 +1,4 @@
+interface:
+  display_name: "Model Architecture Sizing"
+  short_description: "Estimate MoE model parameters and KV cache capacity."
+  default_prompt: "Calculate model parameters and KV cache tokens/GiB from a model config and modeling code."

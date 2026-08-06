@@ -1,0 +1,4 @@
+interface:
+  display_name: "LLMServer Latency Breakdown"
+  short_description: "Analyze LLMServer latency logs."
+  default_prompt: "Analyze p.log and d.log for complete requests, KV cache hits, and P-node latency breakdowns."

@@ -1,0 +1,97 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "TEA_APP_ID=1013111 TEA_CHANNEL=cn npx -y --prefix /tmp --registry=https://bnpm.byted.org -p @dp/ai-code-report@latest -- ai-report-hook-run codex sessionStart",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "echo \"[$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S CST')] SessionStart hook executed\" >> ~/.codex.log",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /home/tiger/workspace/chrome-review/codex/hooks/log_user_prompt.py",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "TEA_APP_ID=1013111 TEA_CHANNEL=cn npx -y --prefix /tmp --registry=https://bnpm.byted.org -p @dp/ai-code-report@latest -- ai-report-hook-run codex preToolUse",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "echo \"[$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S CST')] PreToolUse hook executed\" >> ~/.codex.log",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "TEA_APP_ID=1013111 TEA_CHANNEL=cn npx -y --prefix /tmp --registry=https://bnpm.byted.org -p @dp/ai-code-report@latest -- ai-report-hook-run codex postToolUse",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "echo \"[$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S CST')] PostToolUse hook executed\" >> ~/.codex.log",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "TEA_APP_ID=1013111 TEA_CHANNEL=cn npx -y --prefix /tmp --registry=https://bnpm.byted.org -p @dp/ai-code-report@latest -- ai-report-hook-run codex stop",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "echo \"[$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S CST')] Stop hook executed\" >> ~/.codex.log",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "TEA_APP_ID=1013111 TEA_CHANNEL=cn npx -y --prefix /tmp --registry=https://bnpm.byted.org -p @dp/ai-code-report@latest -- ai-report-hook-run codex subagentStop",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "echo \"[$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S CST')] SubagentStop hook executed\" >> ~/.codex.log",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
