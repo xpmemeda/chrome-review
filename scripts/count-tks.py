@@ -3,13 +3,11 @@ import sys
 import argparse
 import json
 import pathlib
-import transformers
 import logging
 import tqdm
 import numpy
 import time
 import heapq
-import packaging.version as version
 import typing as ty
 
 Messages = ty.List[ty.Dict[str, str]]
@@ -189,12 +187,37 @@ class StdOpenAIMessageJsonL(Dataset):
 
 class Tokenizer:
     def __init__(self, tokenizer_path):
-        self._tokenizer = transformers.AutoTokenizer.from_pretrained(
-            tokenizer_path, trust_remote_code=True
-        )
+        self._tokenizer = None
+        self._encoding = None
+
+        if tokenizer_path == "o200k-base":
+            try:
+                import tiktoken
+            except ImportError as e:
+                raise RuntimeError(
+                    "Tokenizer 'o200k-base' requires the tiktoken Python package."
+                ) from e
+
+            self._encoding = tiktoken.get_encoding("o200k_base")
+        else:
+            try:
+                import transformers
+            except ImportError as e:
+                raise RuntimeError(
+                    "Directory tokenizers require the transformers Python package."
+                ) from e
+
+            self._tokenizer = transformers.AutoTokenizer.from_pretrained(
+                tokenizer_path, trust_remote_code=True
+            )
 
     def tokenize(self, messages_or_text) -> ty.List[int]:
-        if version.Version(transformers.__version__) >= version.Version("5.9.0"):
+        if self._encoding is not None:
+            text = self._to_tiktoken_text(messages_or_text)
+            logging.debug("Tokenizing messages with tiktoken: %s", text)
+            return self._encoding.encode(text)
+
+        if self._tokenizer is not None:
             if isinstance(messages_or_text, str):
                 text = messages_or_text
             else:
@@ -205,8 +228,12 @@ class Tokenizer:
             tokens = self._tokenizer.encode(text)
             return tokens
 
-        else:
-            raise RuntimeError("Tokenizer requires transformers version >= 5.9.0")
+        raise RuntimeError("Tokenizer is not initialized.")
+
+    def _to_tiktoken_text(self, messages_or_text) -> str:
+        if isinstance(messages_or_text, str):
+            return messages_or_text
+        return json.dumps(messages_or_text, separators=(",", ":"), ensure_ascii=False)
 
     def count(self, messages_or_text) -> int:
         token_ids = self.tokenize(messages_or_text)
@@ -500,7 +527,12 @@ if __name__ == "__main__":
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
     )
     cmd_arguments.add_argument("--dataset", type=str, required=True)
-    cmd_arguments.add_argument("--tokenizer", type=str, required=True)
+    cmd_arguments.add_argument(
+        "--tokenizer",
+        type=str,
+        required=True,
+        help="Tokenizer directory path, or 'o200k-base' to use tiktoken.",
+    )
     cmd_arguments = cmd_arguments.parse_args()
 
     logging.basicConfig(level=getattr(logging, cmd_arguments.log_level))
@@ -523,8 +555,10 @@ if __name__ == "__main__":
 
     num_tokens = profiler.num_tokens
     hit_tokens = profiler.hit_tokens
+    avg_tokens = num_tokens / dataset.size()
     token_hit_rate = profiler.token_hit_rate
     request_prefix_hit_rate = profiler.request_prefix_hit_rate
     logging.info(
-        f"{num_tokens=}, {hit_tokens=}, {token_hit_rate=:.2f}, {request_prefix_hit_rate=:.2f}"
+        f"{num_tokens=}, {hit_tokens=}, {avg_tokens=:.2f}, "
+        f"{token_hit_rate=:.2f}, {request_prefix_hit_rate=:.2f}"
     )
