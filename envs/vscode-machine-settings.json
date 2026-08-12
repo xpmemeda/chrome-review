@@ -1,0 +1,9 @@
+{
+    "anyscalecompute.ray-distributed-debugger.initialized": true,
+    "terminal.integrated.defaultProfile.linux": "zsh",
+    "terminal.integrated.profiles.linux": {
+        "zsh": {
+            "path": "/usr/bin/zsh"
+        }
+    }
+}

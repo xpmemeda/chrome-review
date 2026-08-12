@@ -1,7 +1,7 @@
 #!/bin/bash
 
 SCRIPT_DIR=$(realpath "$(dirname "$0")")
-VSCODE_MACHINE_DIR="$HOME/.vscode-server/data/Machine"
+TRAE_DIR="$HOME/.trae"
 
 LinkFile() {
     local source_path="$1"
@@ -18,5 +18,7 @@ LinkFile() {
     ln -s "$source_path" "$target_path"
 }
 
-mkdir -p "$VSCODE_MACHINE_DIR"
-LinkFile "$SCRIPT_DIR/vscode-machine-settings.json" "$VSCODE_MACHINE_DIR/settings.json"
+export PATH=~/.local/bin:$PATH
+
+mkdir -p "$TRAE_DIR"
+LinkFile "$SCRIPT_DIR/traecli.yaml" "$TRAE_DIR/traecli.yaml"

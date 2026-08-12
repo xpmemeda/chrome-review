@@ -26,6 +26,12 @@ function code() {
         echo "command not found: code"
     fi
 }
-alias code-r="code ${HOME}/workspace/chrome-review"
-alias r="${HOME}/workspace/chrome-review"
+if [ -n "${ZSH_VERSION:-}" ]; then
+    _script_path="${(%):-%N}"
+else
+    _script_path="${BASH_SOURCE[0]:-$0}"
+fi
+_chrome_review_dir="$(cd "$(dirname "$_script_path")/.." && pwd)"
+alias code-r="code ${_chrome_review_dir}"
+alias r="${_chrome_review_dir}"
 alias gs="git status"

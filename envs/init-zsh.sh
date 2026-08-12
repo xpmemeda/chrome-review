@@ -4,9 +4,16 @@ yes | sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/mast
 git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
 git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
 
-sudo usermod $(whoami) -s $(which zsh)
+if [ "$(uname -s)" = "Linux" ]; then
+    sudo usermod "$(whoami)" -s "$(which zsh)"
+elif [ "$(uname -s)" = "Darwin" ]; then
+    chsh -s "$(which zsh)"
+fi
 
 SCRIPT_DIR=$(realpath $(dirname "$0"))
 if [ "$SCRIPT_DIR" != "$HOME" ]; then
-    rm -rf "$HOME"/.zshrc && ln -s "$SCRIPT_DIR"/.zshrc "$HOME"/.zshrc
+    if [ -e "$HOME"/.zshrc ] || [ -L "$HOME"/.zshrc ]; then
+        mv "$HOME"/.zshrc "$HOME"/.zshrc.bak
+    fi
+    ln -s "$SCRIPT_DIR"/.zshrc "$HOME"/.zshrc
 fi

@@ -8,8 +8,19 @@ fi
 plugins=(git zsh-autosuggestions zsh-syntax-highlighting)
 source $ZSH/oh-my-zsh.sh
 
-
 SCRIPT_DIR=$(dirname $(realpath ${HOME}/.zshrc))
+
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    if [ "$SCRIPT_DIR" != "$HOME" ]; then
+        source $SCRIPT_DIR/init-macos.sh
+    fi
+    return
+fi
+
+if [[ "$(uname -s)" != "Linux" ]]; then
+    return
+fi
+
 
 # System.
 if [ "$SCRIPT_DIR" != "$HOME" ]; then
@@ -33,10 +44,25 @@ fi
 
 # Bytedance.
 if [ "$SCRIPT_DIR" != "$HOME" ]; then
-    source $SCRIPT_DIR/init-bytedance-env.sh
+    source $SCRIPT_DIR/init-byted-env.sh
 fi
 
 # 3rds
 if [ "$SCRIPT_DIR" != "$HOME" ]; then
     source $SCRIPT_DIR/init-3rds-env.sh
+fi
+
+# Codex
+if [ "$SCRIPT_DIR" != "$HOME" ]; then
+    source $SCRIPT_DIR/init-codex.sh
+fi
+
+# Trae
+if [ "$SCRIPT_DIR" != "$HOME" ]; then
+    source $SCRIPT_DIR/init-trae.sh
+fi
+
+# Vscode
+if [ "$SCRIPT_DIR" != "$HOME" ]; then
+    source $SCRIPT_DIR/init-vscode.sh
 fi
