@@ -21,7 +21,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 /home/tiger/workspace/chrome-review/codex/hooks/log_user_prompt.py",
+            "command": "python3 $HOME/workspace/github/chrome-review/codex/hooks/log_user_prompt.py",
             "timeout": 30
           }
         ]
