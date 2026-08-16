@@ -18,7 +18,5 @@ LinkFile() {
     ln -s "$source_path" "$target_path"
 }
 
-export PATH=~/.local/bin:$PATH
-
 mkdir -p "$TRAE_DIR"
 LinkFile "$SCRIPT_DIR/traecli.yaml" "$TRAE_DIR/traecli.yaml"
