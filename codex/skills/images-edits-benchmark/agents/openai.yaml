@@ -1,0 +1,3 @@
+interface:
+  display_name: "Images Edits Benchmark"
+  short_description: "Benchmark flask-diffsynth image-edit services"
