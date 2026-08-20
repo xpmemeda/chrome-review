@@ -1,0 +1,4 @@
+interface:
+  display_name: "Remote Dev Agent"
+  short_description: "Connect to temporary Agent-only development machines"
+  default_prompt: "Use $remote-dev-agent to connect to the temporary development machine at the IP address I provide."

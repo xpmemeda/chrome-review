@@ -61,3 +61,13 @@ When creating or updating a user-specific Codex skill:
 - Treat the copy in the `chrome-review` repository as the single source of truth; do not keep a separate copied version under `~/.codex/skills`.
 - Before creating the symbolic link, inspect any existing destination. Do not overwrite a real directory or an unrelated symbolic link without user confirmation.
 - Use an absolute path as the symbolic-link target so skill discovery does not depend on the current working directory.
+
+# Temporary Development Machines
+
+When the user provides an IP address for a temporary development machine and
+says the HTTP remote Agent is running, use the `remote-dev-agent` skill.
+
+- Treat the target address as ephemeral and obtain it from the current request.
+- Never reuse a temporary-machine address from an earlier task or conversation.
+- Do not maintain a persistent inventory of temporary machines.
+- Use the Agent's fixed port `18765` and run its health check before other operations.
