@@ -21,6 +21,7 @@ from diffsynth.pipelines.qwen_image import (
 )
 from flask import Flask, request
 from PIL import Image
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 r"""
 Server arguments:
@@ -56,6 +57,10 @@ class ServerConfig:
     enable_cfg: bool
     steps: int
     guidance_scale: float
+    fp8_dit: bool
+    fp8_text_encoder: bool
+    profile_first_request: bool
+    text_encoder_model: ty.Optional[str]
 
 
 @dataclass(frozen=True)
@@ -112,7 +117,76 @@ class DiffSynthEditServer:
         self.config = config
         self.app = Flask(__name__)
         self.work_queue: "queue.Queue[WorkItem]" = queue.Queue()
+        self.profile_pending = config.profile_first_request
         self.app.post("/v1/images/edits")(self.edit_image)
+
+    @staticmethod
+    def quantize_fp8_w8a8(module: torch.nn.Module, name: str) -> None:
+        """Quantize Linear weights and activations to E4M3 FP8 using real CUDA kernels."""
+        from torchao.quantization import (
+            Float8DynamicActivationFloat8WeightConfig,
+            quantize_,
+        )
+
+        logging.info("quantizing %s with TorchAO dynamic FP8 W8A8", name)
+        quantize_(module, Float8DynamicActivationFloat8WeightConfig())
+
+        quantized = []
+        for module_name, child in module.named_modules():
+            if isinstance(child, torch.nn.Linear):
+                weight_type = type(child.weight).__name__
+                if "Float8" in weight_type:
+                    quantized.append((module_name, weight_type, child.weight.dtype))
+        if not quantized:
+            raise RuntimeError(
+                f"FP8 quantization produced no FP8 Linear weights in {name}"
+            )
+        logging.info(
+            "FP8 audit component=%s quantized_linears=%d sample=%s",
+            name,
+            len(quantized),
+            quantized[:3],
+        )
+
+    @staticmethod
+    def audit_native_fp8(module: torch.nn.Module, name: str) -> None:
+        fp8_modules = [
+            (module_name, type(child).__name__)
+            for module_name, child in module.named_modules()
+            if "fp8" in type(child).__name__.lower()
+        ]
+        fp8_tensors = [
+            (tensor_name, str(tensor.dtype), tuple(tensor.shape))
+            for tensor_name, tensor in module.state_dict().items()
+            if tensor.dtype in (torch.float8_e4m3fn, torch.float8_e5m2)
+        ]
+        scale_tensors = [
+            (tensor_name, str(tensor.dtype), tuple(tensor.shape))
+            for tensor_name, tensor in module.state_dict().items()
+            if "scale" in tensor_name.lower()
+        ]
+        logging.info(
+            "native FP8 audit component=%s fp8_modules=%d fp8_tensors=%d scale_tensors=%d "
+            "module_sample=%s tensor_sample=%s scale_sample=%s",
+            name,
+            len(fp8_modules),
+            len(fp8_tensors),
+            len(scale_tensors),
+            fp8_modules[:3],
+            fp8_tensors[:3],
+            scale_tensors[:3],
+        )
+
+    @staticmethod
+    def log_cuda_memory(stage: str) -> None:
+        torch.cuda.synchronize()
+        logging.info(
+            "CUDA memory stage=%s allocated=%.3fGiB reserved=%.3fGiB peak_allocated=%.3fGiB",
+            stage,
+            torch.cuda.memory_allocated() / 2**30,
+            torch.cuda.memory_reserved() / 2**30,
+            torch.cuda.max_memory_allocated() / 2**30,
+        )
 
     def build_item_from_values(
         self,
@@ -194,15 +268,21 @@ class DiffSynthEditServer:
     def load_flux2_pipeline(self) -> Pipeline:
         if os.path.isdir(self.config.model):
             model_configs = [
-                Flux2ModelConfig(
-                    path=[
-                        str(path)
-                        for path in sorted(
-                            Path(self.config.model, "text_encoder").glob(
-                                "*.safetensors"
-                            )
+                *(
+                    [
+                        Flux2ModelConfig(
+                            path=[
+                                str(path)
+                                for path in sorted(
+                                    Path(self.config.model, "text_encoder").glob(
+                                        "*.safetensors"
+                                    )
+                                )
+                            ]
                         )
                     ]
+                    if self.config.text_encoder_model is None
+                    else []
                 ),
                 Flux2ModelConfig(
                     path=str(
@@ -223,14 +303,17 @@ class DiffSynthEditServer:
                     )
                 ),
             ]
-            tokenizer_config = Flux2ModelConfig(
-                path=str(Path(self.config.model, "tokenizer"))
-            )
         else:
             model_configs = [
-                Flux2ModelConfig(
-                    model_id=self.config.model,
-                    origin_file_pattern="text_encoder/*.safetensors",
+                *(
+                    [
+                        Flux2ModelConfig(
+                            model_id=self.config.model,
+                            origin_file_pattern="text_encoder/*.safetensors",
+                        )
+                    ]
+                    if self.config.text_encoder_model is None
+                    else []
                 ),
                 Flux2ModelConfig(
                     model_id=self.config.model,
@@ -241,16 +324,47 @@ class DiffSynthEditServer:
                     origin_file_pattern="vae/diffusion_pytorch_model.safetensors",
                 ),
             ]
-            tokenizer_config = Flux2ModelConfig(
-                model_id=self.config.model,
-                origin_file_pattern="tokenizer/",
-            )
-        return Flux2ImagePipeline.from_pretrained(
+        tokenizer_config = None
+        if self.config.text_encoder_model is None:
+            if os.path.isdir(self.config.model):
+                tokenizer_config = Flux2ModelConfig(
+                    path=str(Path(self.config.model, "tokenizer"))
+                )
+            else:
+                tokenizer_config = Flux2ModelConfig(
+                    model_id=self.config.model,
+                    origin_file_pattern="tokenizer/",
+                )
+
+        pipe = Flux2ImagePipeline.from_pretrained(
             torch_dtype=torch.bfloat16,
             device="cuda",
             model_configs=model_configs,
             tokenizer_config=tokenizer_config,
         )
+        if self.config.text_encoder_model is not None:
+            logging.info(
+                "loading independent Flux2 text encoder model=%s",
+                self.config.text_encoder_model,
+            )
+            pipe.text_encoder_qwen3 = AutoModelForCausalLM.from_pretrained(
+                self.config.text_encoder_model,
+                torch_dtype=None,
+                device_map="cuda",
+                local_files_only=os.path.isdir(self.config.text_encoder_model),
+            )
+            pipe.tokenizer = AutoTokenizer.from_pretrained(
+                self.config.text_encoder_model,
+                local_files_only=os.path.isdir(self.config.text_encoder_model),
+            )
+            self.audit_native_fp8(pipe.text_encoder_qwen3, "text_encoder")
+        else:
+            logging.info("using text encoder and tokenizer bundled in --model")
+        if self.config.fp8_dit:
+            self.quantize_fp8_w8a8(pipe.dit, "dit")
+        if self.config.fp8_text_encoder:
+            self.quantize_fp8_w8a8(pipe.text_encoder_qwen3, "text_encoder")
+        return pipe
 
     def load_qwen_pipeline(self) -> Pipeline:
         if os.path.isdir(self.config.model):
@@ -358,7 +472,43 @@ class DiffSynthEditServer:
     def process_item(self, pipe: Pipeline, item: WorkItem) -> None:
         started = time.perf_counter()
         try:
-            image = self.run_pipeline_one(pipe, item)
+            if self.profile_pending:
+                self.profile_pending = False
+                logging.info("profiling first request for FP8 CUDA kernels")
+                with torch.profiler.profile(
+                    activities=[
+                        torch.profiler.ProfilerActivity.CPU,
+                        torch.profiler.ProfilerActivity.CUDA,
+                    ],
+                    record_shapes=True,
+                ) as prof:
+                    image = self.run_pipeline_one(pipe, item)
+                fp8_events = [
+                    event
+                    for event in prof.key_averages()
+                    if any(
+                        token in event.key.lower() for token in ("scaled_mm", "float8")
+                    )
+                ]
+                logging.info(
+                    "FP8 profiler events=%s",
+                    [
+                        {
+                            "key": event.key,
+                            "calls": event.count,
+                            "cuda_ms": event.device_time_total / 1000.0,
+                        }
+                        for event in fp8_events
+                    ],
+                )
+                if (
+                    self.config.fp8_dit or self.config.fp8_text_encoder
+                ) and not fp8_events:
+                    logging.warning(
+                        "FP8 enabled but profiler found no scaled_mm/float8 events"
+                    )
+            else:
+                image = self.run_pipeline_one(pipe, item)
             item.result = image_to_png_bytes(image)
             item.done.set()
             logging.info(
@@ -375,6 +525,7 @@ class DiffSynthEditServer:
                 image.height,
                 time.perf_counter() - started,
             )
+            self.log_cuda_memory("after_request")
         except Exception as exc:
             item.error = exc
             item.done.set()
@@ -408,12 +559,17 @@ class DiffSynthEditServer:
             dynamic=True,
             fullgraph=False,
         )
+        # Online quantization briefly materializes BF16 and FP8 weights together.
+        # Release those cached BF16 blocks before reporting steady-state memory.
+        torch.cuda.empty_cache()
+        torch.cuda.reset_peak_memory_stats()
         logging.info(
             "model loaded, pipeline=%s enable_cfg=%s default_steps=%d",
             self.config.pipeline_kind,
             self.config.enable_cfg,
             self.config.steps,
         )
+        self.log_cuda_memory("after_load_and_compile")
         return pipe
 
     def run(self) -> None:
@@ -428,6 +584,28 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--enable-cfg", action="store_true")
     parser.add_argument("--guidance-scale", type=float)
     parser.add_argument("--steps", type=int, required=True)
+    parser.add_argument(
+        "--text-encoder-model",
+        help=(
+            "Optional local path or model ID for an independent FLUX.2 Qwen3 "
+            "encoder; when omitted, use text_encoder/ and tokenizer/ from --model."
+        ),
+    )
+    parser.add_argument(
+        "--fp8-dit",
+        action="store_true",
+        help="Use dynamic E4M3 FP8 activations and FP8 weights for the FLUX.2 DiT.",
+    )
+    parser.add_argument(
+        "--fp8-text-encoder",
+        action="store_true",
+        help="Use dynamic E4M3 FP8 activations and FP8 weights for the Qwen3 text encoder.",
+    )
+    parser.add_argument(
+        "--profile-first-request",
+        action="store_true",
+        help="Profile the first request and log scaled_mm/float8 CUDA operators.",
+    )
     return parser.parse_args()
 
 
@@ -438,12 +616,23 @@ def config_from_args(args: argparse.Namespace) -> ServerConfig:
         raise ValueError("--steps must be positive")
     if args.enable_cfg and args.guidance_scale is None:
         raise ValueError("--guidance-scale is required when --enable-cfg is set")
+    pipeline_kind = infer_pipeline_kind(args.model)
+    if (args.fp8_dit or args.fp8_text_encoder) and pipeline_kind != PIPELINE_KIND_FLUX2:
+        raise ValueError("FP8 flags are currently supported only for FLUX.2")
     return ServerConfig(
         model=args.model,
-        pipeline_kind=infer_pipeline_kind(args.model),
+        pipeline_kind=pipeline_kind,
         enable_cfg=args.enable_cfg,
         steps=args.steps,
         guidance_scale=args.guidance_scale if args.guidance_scale is not None else 1.0,
+        fp8_dit=args.fp8_dit,
+        fp8_text_encoder=args.fp8_text_encoder,
+        profile_first_request=args.profile_first_request,
+        text_encoder_model=(
+            os.path.expanduser(args.text_encoder_model)
+            if args.text_encoder_model
+            else None
+        ),
     )
 
 
