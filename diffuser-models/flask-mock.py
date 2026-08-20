@@ -80,7 +80,9 @@ class MockImageEditServer:
             if n != 1:
                 raise ValueError("only n=1 is supported")
         except Exception as exc:
-            return {"error": {"message": str(exc), "type": "invalid_request_error"}}, 400
+            return {
+                "error": {"message": str(exc), "type": "invalid_request_error"}
+            }, 400
 
         b64_json = base64.b64encode(image_to_png_bytes(image)).decode("ascii")
         image_object: JsonDict = {"b64_json": b64_json, "revised_prompt": prompt}

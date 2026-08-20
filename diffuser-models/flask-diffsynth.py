@@ -1,5 +1,6 @@
 import argparse
 import base64
+import collections
 import io
 import logging
 import os
@@ -61,6 +62,12 @@ class ServerConfig:
     fp8_text_encoder: bool
     profile_first_request: bool
     text_encoder_model: ty.Optional[str]
+    compile_mode: str
+    compile_vae: bool
+    prompt_cache_size: int
+    png_compress_level: int
+    overlap_png_encode: bool
+    log_stage_timing: bool
 
 
 @dataclass(frozen=True)
@@ -80,6 +87,7 @@ class WorkItem:
     request_image_bytes: int
     done: threading.Event = field(default_factory=threading.Event)
     result: ty.Optional[bytes] = None
+    result_image: ty.Optional[Image.Image] = None
     error: ty.Optional[BaseException] = None
 
 
@@ -97,9 +105,9 @@ def parse_str(values: ty.Mapping[str, ty.Any], name: str, default: str) -> str:
     return str(value) if value not in (None, "") else default
 
 
-def image_to_png_bytes(image: Image.Image) -> bytes:
+def image_to_png_bytes(image: Image.Image, compress_level: int = 6) -> bytes:
     buf = io.BytesIO()
-    image.save(buf, format="PNG")
+    image.save(buf, format="PNG", compress_level=compress_level)
     return buf.getvalue()
 
 
@@ -118,6 +126,11 @@ class DiffSynthEditServer:
         self.app = Flask(__name__)
         self.work_queue: "queue.Queue[WorkItem]" = queue.Queue()
         self.profile_pending = config.profile_first_request
+        self.prompt_cache: "collections.OrderedDict[ty.Hashable, JsonDict]" = (
+            collections.OrderedDict()
+        )
+        self.prompt_cache_hits = 0
+        self.prompt_cache_misses = 0
         self.app.post("/v1/images/edits")(self.edit_image)
 
     @staticmethod
@@ -224,6 +237,19 @@ class DiffSynthEditServer:
 
         if item.error is not None:
             raise item.error
+        if self.config.overlap_png_encode:
+            if item.result_image is None:
+                raise RuntimeError("empty generation result")
+            encode_started = time.perf_counter()
+            result = image_to_png_bytes(
+                item.result_image,
+                compress_level=self.config.png_compress_level,
+            )
+            if self.config.log_stage_timing:
+                logging.info(
+                    "overlapped png_encode=%.3fs", time.perf_counter() - encode_started
+                )
+            return result
         if item.result is None:
             raise RuntimeError("empty generation result")
         return item.result
@@ -469,6 +495,48 @@ class DiffSynthEditServer:
                 return self.run_flux2_pipeline_one(pipe, item)
             return self.run_qwen_pipeline_one(pipe, item)
 
+    def install_prompt_cache(self, pipe: Pipeline) -> None:
+        if self.config.prompt_cache_size <= 0:
+            return
+        if self.config.pipeline_kind != PIPELINE_KIND_FLUX2:
+            raise ValueError("--prompt-cache-size currently supports only FLUX.2")
+
+        units = [
+            unit
+            for unit in pipe.units
+            if unit.__class__.__name__ == "Flux2Unit_Qwen3PromptEmbedder"
+        ]
+        if len(units) != 1:
+            raise RuntimeError(
+                f"expected one Qwen3 prompt embedder unit, found {len(units)}"
+            )
+        unit = units[0]
+        original_process = unit.process
+
+        def cached_process(
+            pipe_arg: Pipeline, prompt: ty.Union[str, ty.List[str]]
+        ) -> JsonDict:
+            key: ty.Hashable = tuple(prompt) if isinstance(prompt, list) else prompt
+            cached = self.prompt_cache.get(key)
+            if cached is not None:
+                self.prompt_cache.move_to_end(key)
+                self.prompt_cache_hits += 1
+                return cached
+
+            self.prompt_cache_misses += 1
+            result = original_process(pipe_arg, prompt)
+            self.prompt_cache[key] = result
+            self.prompt_cache.move_to_end(key)
+            while len(self.prompt_cache) > self.config.prompt_cache_size:
+                self.prompt_cache.popitem(last=False)
+            return result
+
+        unit.process = cached_process
+        logging.info(
+            "enabled exact prompt embedding cache entries=%d",
+            self.config.prompt_cache_size,
+        )
+
     def process_item(self, pipe: Pipeline, item: WorkItem) -> None:
         started = time.perf_counter()
         try:
@@ -507,10 +575,38 @@ class DiffSynthEditServer:
                     logging.warning(
                         "FP8 enabled but profiler found no scaled_mm/float8 events"
                     )
+                top_cuda_events = sorted(
+                    prof.key_averages(),
+                    key=lambda event: event.device_time_total,
+                    reverse=True,
+                )[:20]
+                logging.info(
+                    "CUDA profiler top events=%s",
+                    [
+                        {
+                            "key": event.key,
+                            "calls": event.count,
+                            "cuda_ms": event.device_time_total / 1000.0,
+                        }
+                        for event in top_cuda_events
+                    ],
+                )
             else:
                 image = self.run_pipeline_one(pipe, item)
-            item.result = image_to_png_bytes(image)
-            item.done.set()
+            pipeline_finished = time.perf_counter()
+            if self.config.overlap_png_encode:
+                # Wake the Flask request thread so CPU PNG encoding can overlap
+                # the next queued GPU inference.
+                item.result_image = image
+                item.done.set()
+            else:
+                item.result = image_to_png_bytes(
+                    image,
+                    compress_level=self.config.png_compress_level,
+                )
+            png_finished = time.perf_counter()
+            if not self.config.overlap_png_encode:
+                item.done.set()
             logging.info(
                 "generated steps=%d enable_cfg=%s mask=%s edit_image_auto_resize=%s size=%dx%d "
                 "request_image_bytes=%d result_size=%dx%d elapsed=%.3fs",
@@ -525,6 +621,16 @@ class DiffSynthEditServer:
                 image.height,
                 time.perf_counter() - started,
             )
+            if self.config.log_stage_timing:
+                logging.info(
+                    "stage timing pipeline=%.3fs png_encode=%.3fs total=%.3fs "
+                    "prompt_cache_hits=%d prompt_cache_misses=%d",
+                    pipeline_finished - started,
+                    png_finished - pipeline_finished,
+                    png_finished - started,
+                    self.prompt_cache_hits,
+                    self.prompt_cache_misses,
+                )
             self.log_cuda_memory("after_request")
         except Exception as exc:
             item.error = exc
@@ -553,12 +659,29 @@ class DiffSynthEditServer:
             pipe = self.load_flux2_pipeline()
         else:
             pipe = self.load_qwen_pipeline()
+        self.install_prompt_cache(pipe)
         logging.info("compiling pipeline models")
         pipe.compile_pipeline(
-            mode="default",
+            mode=self.config.compile_mode,
             dynamic=True,
             fullgraph=False,
         )
+        if self.config.compile_vae:
+            logging.info(
+                "compiling VAE encode and decode mode=%s", self.config.compile_mode
+            )
+            pipe.vae.encode = torch.compile(
+                pipe.vae.encode,
+                mode=self.config.compile_mode,
+                dynamic=True,
+                fullgraph=False,
+            )
+            pipe.vae.decode = torch.compile(
+                pipe.vae.decode,
+                mode=self.config.compile_mode,
+                dynamic=True,
+                fullgraph=False,
+            )
         # Online quantization briefly materializes BF16 and FP8 weights together.
         # Release those cached BF16 blocks before reporting steady-state memory.
         torch.cuda.empty_cache()
@@ -606,6 +729,46 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Profile the first request and log scaled_mm/float8 CUDA operators.",
     )
+    parser.add_argument(
+        "--compile-mode",
+        choices=(
+            "default",
+            "reduce-overhead",
+            "max-autotune",
+            "max-autotune-no-cudagraphs",
+        ),
+        default="default",
+        help="torch.compile mode for the DiT and optionally VAE.",
+    )
+    parser.add_argument(
+        "--compile-vae",
+        action="store_true",
+        help="Compile FLUX.2 VAE encode and decode in addition to the DiT.",
+    )
+    parser.add_argument(
+        "--prompt-cache-size",
+        type=int,
+        default=0,
+        help="Number of exact FLUX.2 prompt embeddings to retain on GPU; 0 disables caching.",
+    )
+    parser.add_argument(
+        "--png-compress-level",
+        type=int,
+        choices=range(10),
+        default=6,
+        metavar="0..9",
+        help="PNG compression level; Pillow's default is 6.",
+    )
+    parser.add_argument(
+        "--log-stage-timing",
+        action="store_true",
+        help="Log pipeline and PNG encoding wall times for every request.",
+    )
+    parser.add_argument(
+        "--overlap-png-encode",
+        action="store_true",
+        help="Encode PNG in Flask request threads so it can overlap the next GPU request.",
+    )
     return parser.parse_args()
 
 
@@ -616,6 +779,8 @@ def config_from_args(args: argparse.Namespace) -> ServerConfig:
         raise ValueError("--steps must be positive")
     if args.enable_cfg and args.guidance_scale is None:
         raise ValueError("--guidance-scale is required when --enable-cfg is set")
+    if args.prompt_cache_size < 0:
+        raise ValueError("--prompt-cache-size must be non-negative")
     pipeline_kind = infer_pipeline_kind(args.model)
     if (args.fp8_dit or args.fp8_text_encoder) and pipeline_kind != PIPELINE_KIND_FLUX2:
         raise ValueError("FP8 flags are currently supported only for FLUX.2")
@@ -633,6 +798,12 @@ def config_from_args(args: argparse.Namespace) -> ServerConfig:
             if args.text_encoder_model
             else None
         ),
+        compile_mode=args.compile_mode,
+        compile_vae=args.compile_vae,
+        prompt_cache_size=args.prompt_cache_size,
+        png_compress_level=args.png_compress_level,
+        overlap_png_encode=args.overlap_png_encode,
+        log_stage_timing=args.log_stage_timing,
     )
 
 
