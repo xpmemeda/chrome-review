@@ -13,6 +13,7 @@ SCRIPT_DIR=$(dirname $(realpath ${HOME}/.zshrc))
 if [[ "$(uname -s)" == "Darwin" ]]; then
     if [ "$SCRIPT_DIR" != "$HOME" ]; then
         source $SCRIPT_DIR/init-macos.sh
+        source $SCRIPT_DIR/init-codex.sh
     fi
     return
 fi

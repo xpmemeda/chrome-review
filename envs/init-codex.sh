@@ -24,6 +24,7 @@ mkdir -p "$CODEX_DIR"
 mkdir -p "$CODEX_SKILLS_DIR"
 
 LinkFile "$REPO_DIR/codex/hooks.json" "$CODEX_DIR/hooks.json"
+LinkFile "$REPO_DIR/codex/AGENTS.md" "$CODEX_DIR/AGENTS.md"
 
 for skill_dir in "$REPO_DIR"/codex/skills/*; do
     if [ ! -f "$skill_dir/SKILL.md" ]; then
