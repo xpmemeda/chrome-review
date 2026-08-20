@@ -51,3 +51,13 @@ export https_proxy=$HTTPS_PROXY
 export NO_PROXY="localhost,127.0.0.1,mirrors.ivolces.com,pypi.org,files.pythonhosted.org,pypi.python.org"
 export PIP_INDEX_URL=https://mirrors.ivolces.com/pypi/simple
 ```
+
+# Codex Skills
+
+When creating or updating a user-specific Codex skill:
+
+- Store the canonical skill source under `~/workspace/github/chrome-review/codex/skills/<skill-name>`.
+- Expose the skill to Codex with a symbolic link at `~/.codex/skills/<skill-name>`.
+- Treat the copy in the `chrome-review` repository as the single source of truth; do not keep a separate copied version under `~/.codex/skills`.
+- Before creating the symbolic link, inspect any existing destination. Do not overwrite a real directory or an unrelated symbolic link without user confirmation.
+- Use an absolute path as the symbolic-link target so skill discovery does not depend on the current working directory.
