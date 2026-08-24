@@ -39,7 +39,6 @@ POST /v1/images/edits multipart/form-data fields:
 | image  | yes      | Source image file.                           |
 | prompt | yes      | Edit instruction.                            |
 | mask   | no       | Mask image file; must match the image size.  |
-| n      | no       | Output image count; only n=1 is supported.   |
 
 Responses always use b64_json.
 """
@@ -93,11 +92,6 @@ class WorkItem:
 
 JsonDict = ty.Dict[str, ty.Any]
 Pipeline = ty.Any
-
-
-def parse_int(values: ty.Mapping[str, ty.Any], name: str, default: int) -> int:
-    value = values.get(name)
-    return int(value) if value not in (None, "") else default
 
 
 def parse_str(values: ty.Mapping[str, ty.Any], name: str, default: str) -> str:
@@ -273,9 +267,6 @@ class DiffSynthEditServer:
                 len(image_bytes),
                 request.form,
             )
-            n = parse_int(request.form, "n", 1)
-            if n != 1:
-                raise ValueError("only n=1 is supported")
         except Exception as exc:
             return {
                 "error": {"message": str(exc), "type": "invalid_request_error"}
