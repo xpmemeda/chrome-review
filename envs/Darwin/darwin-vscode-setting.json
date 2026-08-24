@@ -1,0 +1,16 @@
+{
+    "terminal.integrated.defaultProfile.osx": "zsh",
+    "window.restoreWindows": "none",
+    "remote.defaultExtensionsIfInstalledLocally": [
+        "GitHub.copilot",
+        "GitHub.copilot-chat",
+        "GitHub.vscode-pull-request-github",
+        "byted-merlin.merlin-devbox"
+    ],
+    "remote.SSH.configFile": "",
+    "security.workspace.trust.untrustedFiles": "open",
+    "chat.viewSessions.orientation": "stacked",
+    "git.enabled": true,
+    "git.decorations.enabled": true,
+    "scm.diffDecorations": "all"
+}

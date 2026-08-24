@@ -31,7 +31,7 @@ if [ -n "${ZSH_VERSION:-}" ]; then
 else
     _script_path="${BASH_SOURCE[0]:-$0}"
 fi
-_chrome_review_dir="$(cd "$(dirname "$_script_path")/.." && pwd)"
+_chrome_review_dir="$(cd "$(dirname "$_script_path")/../.." && pwd)"
 alias code-r="code ${_chrome_review_dir}"
 alias r="${_chrome_review_dir}"
 alias gs="git status"

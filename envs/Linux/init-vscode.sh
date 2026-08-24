@@ -1,7 +1,6 @@
 #!/bin/bash
 
-SCRIPT_DIR=$(realpath "$(dirname "$0")")
-VSCODE_MACHINE_DIR="$HOME/.vscode-server/data/Machine"
+VSCODE_SETTINGS_DIR="$HOME/.vscode-server/data/Machine"
 
 LinkFile() {
     local source_path="$1"
@@ -18,5 +17,5 @@ LinkFile() {
     ln -s "$source_path" "$target_path"
 }
 
-mkdir -p "$VSCODE_MACHINE_DIR"
-LinkFile "$SCRIPT_DIR/vscode-machine-settings.json" "$VSCODE_MACHINE_DIR/settings.json"
+mkdir -p "$VSCODE_SETTINGS_DIR"
+LinkFile "$SCRIPT_DIR/Linux/linux-vscode-setting.json" "$VSCODE_SETTINGS_DIR/settings.json"

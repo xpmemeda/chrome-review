@@ -1,7 +1,6 @@
 #!/bin/bash
 
-SCRIPT_DIR=$(realpath "$(dirname "$0")")
-TRAE_DIR="$HOME/.trae"
+VSCODE_SETTINGS_DIR="$HOME/Library/Application Support/Code/User"
 
 LinkFile() {
     local source_path="$1"
@@ -18,5 +17,5 @@ LinkFile() {
     ln -s "$source_path" "$target_path"
 }
 
-mkdir -p "$TRAE_DIR"
-LinkFile "$SCRIPT_DIR/traecli.yaml" "$TRAE_DIR/traecli.yaml"
+mkdir -p "$VSCODE_SETTINGS_DIR"
+LinkFile "$SCRIPT_DIR/Darwin/darwin-vscode-setting.json" "$VSCODE_SETTINGS_DIR/settings.json"
