@@ -1,4 +1,4 @@
 interface:
-  display_name: "LLMServer Latency Breakdown"
-  short_description: "Analyze LLMServer latency logs."
-  default_prompt: "Analyze p.log and d.log for complete requests, KV cache hits, and P-node latency breakdowns."
+  display_name: "LLMServer 延迟分解"
+  short_description: "分析 LLMServer 数据与延迟日志"
+  default_prompt: "使用 $llmserver-latency-breakdown 分析 p.log 和 d.log 中的完整请求、KV cache 命中情况及 P 节点延迟分解。"

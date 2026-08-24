@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import shlex
 import ssl
 import sys
 import time
@@ -54,7 +55,8 @@ def command_payload(args, *, timeout: bool) -> dict:
             raise SystemExit(f"invalid --env value: {item}")
         key, value = item.split("=", 1)
         env[key] = value
-    payload = {"command": " ".join(command), "env": env}
+    command_text = command[0] if len(command) == 1 else shlex.join(command)
+    payload = {"command": command_text, "env": env}
     if args.cwd:
         payload["cwd"] = args.cwd
     if timeout:

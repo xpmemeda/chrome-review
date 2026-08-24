@@ -1,4 +1,4 @@
 interface:
-  display_name: "Remote Dev Agent"
-  short_description: "Connect to temporary Agent-only development machines"
-  default_prompt: "Use $remote-dev-agent to connect to the temporary development machine at the IP address I provide."
+  display_name: "远程开发 Agent"
+  short_description: "连接仅支持 Agent 的临时开发机器"
+  default_prompt: "使用 $remote-dev-agent 连接我提供 IP 地址的临时开发机器。"

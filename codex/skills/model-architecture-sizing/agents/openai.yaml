@@ -1,4 +1,4 @@
 interface:
-  display_name: "Model Architecture Sizing"
-  short_description: "Estimate MoE model parameters and KV cache capacity."
-  default_prompt: "Calculate model parameters and KV cache tokens/GiB from a model config and modeling code."
+  display_name: "模型架构容量计算"
+  short_description: "估算 MoE 参数量与 KV cache 容量"
+  default_prompt: "使用 $model-architecture-sizing 根据模型 config 和 modeling 源码计算参数量及 KV cache 的 tokens/GiB。"

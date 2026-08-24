@@ -1,4 +1,0 @@
-interface:
-  display_name: "IP Log Troubleshooting"
-  short_description: "Fetch remote service logs by IP and troubleshoot issues."
-  default_prompt: "Use $ip-log-troubleshooting to investigate a problem on a given IP by fetching the dated Bernard stdout service log and consulting llmserver or kvcache source as needed."

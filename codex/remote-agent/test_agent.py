@@ -21,6 +21,16 @@ class AgentTest(unittest.TestCase):
         args = Namespace(command=["--", "printf hello"], env=[], cwd=None, timeout=3)
         self.assertEqual(command_payload(args, timeout=True)["command"], "printf hello")
 
+    def test_client_preserves_multiple_argument_boundaries(self):
+        args = Namespace(
+            command=["--", "python3", "-c", "print('hello world')"],
+            env=[], cwd=None, timeout=3,
+        )
+        self.assertEqual(
+            command_payload(args, timeout=True)["command"],
+            "python3 -c 'print('\"'\"'hello world'\"'\"')'",
+        )
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name) / "root"

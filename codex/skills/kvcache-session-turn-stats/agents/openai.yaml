@@ -1,0 +1,4 @@
+interface:
+  display_name: "KV Cache 会话轮次统计"
+  short_description: "统计会话请求长度、命中率及第 15–25 轮 token 变化"
+  default_prompt: "使用 $kvcache-session-turn-stats 筛选首次出现时间不早于 06:00 的会话，并报告请求长度、命中率以及第 15–25 轮的平均新增与重写 token 数。"

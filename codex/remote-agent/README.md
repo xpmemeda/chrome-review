@@ -41,6 +41,11 @@ python3 client.py upload ./server.py /home/user/workspace/server.py
 python3 client.py download /home/user/workspace/result.json ./result.json
 ```
 
+Multiple command arguments are shell-quoted by the client before being sent to
+the agent, so argument boundaries are preserved. For commands that intentionally
+use shell syntax such as pipes or redirections, pass the complete command as one
+quoted argument.
+
 Start and manage a long-running service:
 
 ```bash

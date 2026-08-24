@@ -1,24 +1,24 @@
 ---
 name: remote-dev-agent
-description: Connect to a temporary development machine through the chrome-review HTTP remote agent when the user says SSH is unavailable and provides the current IP address. Do not use for machines reachable through SSH or when the Agent is not running.
+description: 当用户说明 SSH 不可用并提供当前 IP 地址时，通过 chrome-review HTTP remote Agent 连接临时开发机器。不要用于可通过 SSH 访问的机器，也不要在 Agent 未运行时使用。
 ---
 
-# Remote Dev Agent
+# 远程开发 Agent
 
-Use the client at `~/workspace/github/chrome-review/codex/remote-agent/client.py` to operate a temporary development machine on which the user has manually started `agent.py`.
+使用 `~/workspace/github/chrome-review/codex/remote-agent/client.py` 操作用户已手动启动 `agent.py` 的临时开发机器。
 
-## Target handling
+## 目标处理
 
-- Obtain the target IP from the current user request. Never reuse an address from an earlier task or conversation.
-- Do not create or consult a persistent machine inventory; these machines are ephemeral.
-- Use the fixed Agent port `18765`.
-- Enclose an IPv6 address in square brackets: `http://[IPV6]:18765`.
-- Do not attempt SSH when the user says the target is Agent-only.
-- Run `health` before any other operation and check the returned hostname and allowed roots against the current task.
+- 从当前用户请求中获取目标 IP，绝不复用以前任务或对话中的地址。
+- 不要创建或查询持久化机器清单；这些机器都是临时的。
+- 使用固定 Agent 端口 `18765`。
+- IPv6 地址需放在方括号中：`http://[IPV6]:18765`。
+- 用户说明目标仅支持 Agent 时，不要尝试 SSH。
+- 任何其他操作前先运行 `health`，并核对返回的主机名和允许访问的根目录是否符合当前任务。
 
-## Operations
+## 操作
 
-Run the client from `~/workspace/github/chrome-review/codex/remote-agent` or use its absolute path.
+从 `~/workspace/github/chrome-review/codex/remote-agent` 运行客户端，或使用其绝对路径：
 
 ```bash
 python3 client.py --url 'http://[IPV6]:18765' health
@@ -27,10 +27,10 @@ python3 client.py --url 'http://[IPV6]:18765' upload LOCAL_PATH REMOTE_PATH
 python3 client.py --url 'http://[IPV6]:18765' download REMOTE_PATH LOCAL_PATH
 ```
 
-- Use `exec` for bounded commands.
-- Use `start`, `status`, `logs`, and `stop` for long-running services.
-- Record every job ID returned by `start` so later calls manage the intended process.
-- Only stop jobs started during the current task unless the user explicitly places another process in scope.
-- Keep command working directories and file transfers within the allowed roots reported by `health`.
-- The Agent has no authentication. Treat possession of the current IP as authority only for work the user actually requested; it does not broaden the requested scope.
-- If `health` fails, report the connection error and ask the user to verify the current IP and that the Agent is running. Do not fall back to a previously used IP.
+- 使用 `exec` 执行有边界的命令。
+- 使用 `start`、`status`、`logs` 和 `stop` 管理长时间运行的服务。
+- 记录 `start` 返回的每个 job ID，确保后续调用管理正确进程。
+- 除非用户明确将其他进程纳入范围，否则只停止当前任务启动的 job。
+- 命令工作目录和文件传输必须位于 `health` 返回的允许根目录内。
+- Agent 没有认证。拥有当前 IP 只代表可执行用户实际请求的工作，并不会扩大任务授权范围。
+- 如果 `health` 失败，报告连接错误，并请用户确认当前 IP 和 Agent 是否正在运行。不要回退到以前使用过的 IP。
