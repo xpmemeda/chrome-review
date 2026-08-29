@@ -5,31 +5,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "TEA_APP_ID=1013111 TEA_CHANNEL=cn npx -y --prefix /tmp --registry=https://bnpm.byted.org -p @dp/ai-code-report@latest -- ai-report-hook-run codex sessionStart",
-            "timeout": 30
-          },
-          {
-            "type": "command",
-            "command": "echo \"[$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S CST')] SessionStart hook executed\" >> ~/.codex.log",
-            "timeout": 30
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "command": "[ -e '/Applications/Flux Island.app/Contents/MacOS/Flux Island' ] || exit 0; ELECTRON_RUN_AS_NODE=1 '/Applications/Flux Island.app/Contents/MacOS/Flux Island' '/Applications/Flux Island.app/Contents/Resources/bin/flux-hooks-relay' --source codex",
-            "type": "command",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "command": "[ -e '/Applications/Flux Island.app/Contents/MacOS/Flux Island' ] || exit 0; TEA_APP_ID=1013111 TEA_CHANNEL=cn TEA_APP_NAME_FOR_BITS=@fluxisland@0.1.31@0.4.9 ELECTRON_RUN_AS_NODE=1 '/Applications/Flux Island.app/Contents/MacOS/Flux Island' '/Applications/Flux Island.app/Contents/Resources/bin/flux-bits-report' codex sessionStart",
-            "type": "command",
-            "timeout": 30
+            "command": "$HOME/workspace/github/chrome-review/codex/hooks/run-hook.sh sessionStart",
+            "timeout": 70
           }
         ]
       }
@@ -39,17 +16,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 $HOME/workspace/github/chrome-review/codex/hooks/log_user_prompt.py",
-            "timeout": 30
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "command": "[ -e '/Applications/Flux Island.app/Contents/MacOS/Flux Island' ] || exit 0; ELECTRON_RUN_AS_NODE=1 '/Applications/Flux Island.app/Contents/MacOS/Flux Island' '/Applications/Flux Island.app/Contents/Resources/bin/flux-hooks-relay' --source codex",
-            "type": "command",
-            "timeout": 5
+            "command": "$HOME/workspace/github/chrome-review/codex/hooks/run-hook.sh userPromptSubmit",
+            "timeout": 40
           }
         ]
       }
@@ -60,32 +28,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "TEA_APP_ID=1013111 TEA_CHANNEL=cn npx -y --prefix /tmp --registry=https://bnpm.byted.org -p @dp/ai-code-report@latest -- ai-report-hook-run codex preToolUse",
-            "timeout": 30
-          },
-          {
-            "type": "command",
-            "command": "echo \"[$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S CST')] PreToolUse hook executed\" >> ~/.codex.log",
-            "timeout": 30
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "command": "[ -e '/Applications/Flux Island.app/Contents/MacOS/Flux Island' ] || exit 0; ELECTRON_RUN_AS_NODE=1 '/Applications/Flux Island.app/Contents/MacOS/Flux Island' '/Applications/Flux Island.app/Contents/Resources/bin/flux-hooks-relay' --source codex",
-            "type": "command",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "matcher": ".*",
-        "hooks": [
-          {
-            "command": "[ -e '/Applications/Flux Island.app/Contents/MacOS/Flux Island' ] || exit 0; TEA_APP_ID=1013111 TEA_CHANNEL=cn TEA_APP_NAME_FOR_BITS=@fluxisland@0.1.31@0.4.9 ELECTRON_RUN_AS_NODE=1 '/Applications/Flux Island.app/Contents/MacOS/Flux Island' '/Applications/Flux Island.app/Contents/Resources/bin/flux-bits-report' codex preToolUse",
-            "type": "command",
-            "timeout": 30
+            "command": "$HOME/workspace/github/chrome-review/codex/hooks/run-hook.sh preToolUse",
+            "timeout": 70
           }
         ]
       }
@@ -96,32 +40,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "TEA_APP_ID=1013111 TEA_CHANNEL=cn npx -y --prefix /tmp --registry=https://bnpm.byted.org -p @dp/ai-code-report@latest -- ai-report-hook-run codex postToolUse",
-            "timeout": 30
-          },
-          {
-            "type": "command",
-            "command": "echo \"[$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S CST')] PostToolUse hook executed\" >> ~/.codex.log",
-            "timeout": 30
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "command": "[ -e '/Applications/Flux Island.app/Contents/MacOS/Flux Island' ] || exit 0; ELECTRON_RUN_AS_NODE=1 '/Applications/Flux Island.app/Contents/MacOS/Flux Island' '/Applications/Flux Island.app/Contents/Resources/bin/flux-hooks-relay' --source codex",
-            "type": "command",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "matcher": ".*",
-        "hooks": [
-          {
-            "command": "[ -e '/Applications/Flux Island.app/Contents/MacOS/Flux Island' ] || exit 0; TEA_APP_ID=1013111 TEA_CHANNEL=cn TEA_APP_NAME_FOR_BITS=@fluxisland@0.1.31@0.4.9 ELECTRON_RUN_AS_NODE=1 '/Applications/Flux Island.app/Contents/MacOS/Flux Island' '/Applications/Flux Island.app/Contents/Resources/bin/flux-bits-report' codex postToolUse",
-            "type": "command",
-            "timeout": 30
+            "command": "$HOME/workspace/github/chrome-review/codex/hooks/run-hook.sh postToolUse",
+            "timeout": 70
           }
         ]
       }
@@ -131,31 +51,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "TEA_APP_ID=1013111 TEA_CHANNEL=cn npx -y --prefix /tmp --registry=https://bnpm.byted.org -p @dp/ai-code-report@latest -- ai-report-hook-run codex stop",
-            "timeout": 30
-          },
-          {
-            "type": "command",
-            "command": "echo \"[$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S CST')] Stop hook executed\" >> ~/.codex.log",
-            "timeout": 30
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "command": "[ -e '/Applications/Flux Island.app/Contents/MacOS/Flux Island' ] || exit 0; ELECTRON_RUN_AS_NODE=1 '/Applications/Flux Island.app/Contents/MacOS/Flux Island' '/Applications/Flux Island.app/Contents/Resources/bin/flux-hooks-relay' --source codex",
-            "type": "command",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "command": "[ -e '/Applications/Flux Island.app/Contents/MacOS/Flux Island' ] || exit 0; TEA_APP_ID=1013111 TEA_CHANNEL=cn TEA_APP_NAME_FOR_BITS=@fluxisland@0.1.31@0.4.9 ELECTRON_RUN_AS_NODE=1 '/Applications/Flux Island.app/Contents/MacOS/Flux Island' '/Applications/Flux Island.app/Contents/Resources/bin/flux-bits-report' codex stop",
-            "type": "command",
-            "timeout": 30
+            "command": "$HOME/workspace/github/chrome-review/codex/hooks/run-hook.sh stop",
+            "timeout": 70
           }
         ]
       }
@@ -165,45 +62,22 @@
         "hooks": [
           {
             "type": "command",
-            "command": "TEA_APP_ID=1013111 TEA_CHANNEL=cn npx -y --prefix /tmp --registry=https://bnpm.byted.org -p @dp/ai-code-report@latest -- ai-report-hook-run codex subagentStop",
-            "timeout": 30
-          },
-          {
-            "type": "command",
-            "command": "echo \"[$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S CST')] SubagentStop hook executed\" >> ~/.codex.log",
-            "timeout": 30
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "command": "[ -e '/Applications/Flux Island.app/Contents/MacOS/Flux Island' ] || exit 0; ELECTRON_RUN_AS_NODE=1 '/Applications/Flux Island.app/Contents/MacOS/Flux Island' '/Applications/Flux Island.app/Contents/Resources/bin/flux-hooks-relay' --source codex",
-            "type": "command",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "command": "[ -e '/Applications/Flux Island.app/Contents/MacOS/Flux Island' ] || exit 0; TEA_APP_ID=1013111 TEA_CHANNEL=cn TEA_APP_NAME_FOR_BITS=@fluxisland@0.1.31@0.4.9 ELECTRON_RUN_AS_NODE=1 '/Applications/Flux Island.app/Contents/MacOS/Flux Island' '/Applications/Flux Island.app/Contents/Resources/bin/flux-bits-report' codex subagentStop",
-            "type": "command",
-            "timeout": 30
+            "command": "$HOME/workspace/github/chrome-review/codex/hooks/run-hook.sh subagentStop",
+            "timeout": 70
           }
         ]
       }
     ],
     "PermissionRequest": [
       {
+        "matcher": "*",
         "hooks": [
           {
-            "command": "[ -e '/Applications/Flux Island.app/Contents/MacOS/Flux Island' ] || exit 0; ELECTRON_RUN_AS_NODE=1 '/Applications/Flux Island.app/Contents/MacOS/Flux Island' '/Applications/Flux Island.app/Contents/Resources/bin/flux-hooks-relay' --source codex",
             "type": "command",
-            "timeout": 86400
+            "command": "$HOME/workspace/github/chrome-review/codex/hooks/run-hook.sh permissionRequest",
+            "timeout": 86410
           }
-        ],
-        "matcher": "*"
+        ]
       }
     ]
   }
