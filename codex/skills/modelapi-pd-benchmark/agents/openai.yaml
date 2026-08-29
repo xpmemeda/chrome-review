@@ -1,0 +1,4 @@
+interface:
+  display_name: "ModelAPI PD 性能测试"
+  short_description: "测试 ModelAPI Prefill 与 Decode 节点性能"
+  default_prompt: "使用 $modelapi-pd-benchmark 测试指定模型的 Prefill 和 Decode 性能。"

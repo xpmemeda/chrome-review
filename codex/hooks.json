@@ -5,13 +5,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "TEA_APP_ID=1013111 TEA_CHANNEL=cn npx -y --prefix /tmp --registry=https://bnpm.byted.org -p @dp/ai-code-report@latest -- ai-report-hook-run codex sessionStart",
-            "timeout": 30
-          },
-          {
-            "type": "command",
-            "command": "echo \"[$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S CST')] SessionStart hook executed\" >> ~/.codex.log",
-            "timeout": 30
+            "command": "$HOME/workspace/github/chrome-review/codex/hooks/run-hook.sh sessionStart",
+            "timeout": 70
           }
         ]
       },
@@ -39,8 +34,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 $HOME/workspace/github/chrome-review/codex/hooks/log_user_prompt.py",
-            "timeout": 30
+            "command": "$HOME/workspace/github/chrome-review/codex/hooks/run-hook.sh userPromptSubmit",
+            "timeout": 40
           }
         ]
       },
@@ -60,13 +55,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "TEA_APP_ID=1013111 TEA_CHANNEL=cn npx -y --prefix /tmp --registry=https://bnpm.byted.org -p @dp/ai-code-report@latest -- ai-report-hook-run codex preToolUse",
-            "timeout": 30
-          },
-          {
-            "type": "command",
-            "command": "echo \"[$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S CST')] PreToolUse hook executed\" >> ~/.codex.log",
-            "timeout": 30
+            "command": "$HOME/workspace/github/chrome-review/codex/hooks/run-hook.sh preToolUse",
+            "timeout": 70
           }
         ]
       },
@@ -96,13 +86,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "TEA_APP_ID=1013111 TEA_CHANNEL=cn npx -y --prefix /tmp --registry=https://bnpm.byted.org -p @dp/ai-code-report@latest -- ai-report-hook-run codex postToolUse",
-            "timeout": 30
-          },
-          {
-            "type": "command",
-            "command": "echo \"[$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S CST')] PostToolUse hook executed\" >> ~/.codex.log",
-            "timeout": 30
+            "command": "$HOME/workspace/github/chrome-review/codex/hooks/run-hook.sh postToolUse",
+            "timeout": 70
           }
         ]
       },
@@ -131,13 +116,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "TEA_APP_ID=1013111 TEA_CHANNEL=cn npx -y --prefix /tmp --registry=https://bnpm.byted.org -p @dp/ai-code-report@latest -- ai-report-hook-run codex stop",
-            "timeout": 30
-          },
-          {
-            "type": "command",
-            "command": "echo \"[$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S CST')] Stop hook executed\" >> ~/.codex.log",
-            "timeout": 30
+            "command": "$HOME/workspace/github/chrome-review/codex/hooks/run-hook.sh stop",
+            "timeout": 70
           }
         ]
       },
@@ -165,13 +145,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "TEA_APP_ID=1013111 TEA_CHANNEL=cn npx -y --prefix /tmp --registry=https://bnpm.byted.org -p @dp/ai-code-report@latest -- ai-report-hook-run codex subagentStop",
-            "timeout": 30
-          },
-          {
-            "type": "command",
-            "command": "echo \"[$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S CST')] SubagentStop hook executed\" >> ~/.codex.log",
-            "timeout": 30
+            "command": "$HOME/workspace/github/chrome-review/codex/hooks/run-hook.sh subagentStop",
+            "timeout": 70
           }
         ]
       },
@@ -195,6 +170,16 @@
       }
     ],
     "PermissionRequest": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/workspace/github/chrome-review/codex/hooks/run-hook.sh permissionRequest",
+            "timeout": 86410
+          }
+        ]
+      },
       {
         "hooks": [
           {
