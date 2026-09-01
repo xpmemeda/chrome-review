@@ -12,8 +12,6 @@ payload="$(mktemp "${TMPDIR:-/tmp}/codex-hook.XXXXXX")"
 trap 'rm -f "$payload"' EXIT
 cat > "$payload"
 
-flux_app="/Applications/Flux Island.app/Contents/MacOS/Flux Island"
-flux_resources="/Applications/Flux Island.app/Contents/Resources/bin"
 status=0
 
 run_step() {
@@ -47,61 +45,30 @@ run_log() {
     "$label" >> "$HOME/.codex.log" || status=1
 }
 
-run_flux_relay() {
-  [[ -e "$flux_app" ]] || return 0
-  run_step flux-relay "$1" env \
-    ELECTRON_RUN_AS_NODE=1 \
-    "$flux_app" "$flux_resources/flux-hooks-relay" --source codex
-}
-
-run_flux_bits() {
-  [[ -e "$flux_app" ]] || return 0
-  run_step flux-bits 30 env \
-    TEA_APP_ID=1013111 \
-    TEA_CHANNEL=cn \
-    TEA_APP_NAME_FOR_BITS=@fluxisland@0.1.31@0.4.9 \
-    ELECTRON_RUN_AS_NODE=1 \
-    "$flux_app" "$flux_resources/flux-bits-report" codex "$event"
-}
-
 case "$event" in
   sessionStart)
     run_ai_report
     run_log SessionStart
-    run_flux_relay 5
-    run_flux_bits
     ;;
   userPromptSubmit)
     run_step log-user-prompt 30 \
       python3 "$HOME/workspace/github/chrome-review/codex/hooks/log_user_prompt.py"
-    run_flux_relay 5
     ;;
   preToolUse)
     run_ai_report
     run_log PreToolUse
-    run_flux_relay 5
-    run_flux_bits
     ;;
   postToolUse)
     run_ai_report
     run_log PostToolUse
-    run_flux_relay 5
-    run_flux_bits
     ;;
   stop)
     run_ai_report
     run_log Stop
-    run_flux_relay 5
-    run_flux_bits
     ;;
   subagentStop)
     run_ai_report
     run_log SubagentStop
-    run_flux_relay 5
-    run_flux_bits
-    ;;
-  permissionRequest)
-    run_flux_relay 86400
     ;;
   *)
     echo "run-hook.sh: unknown hook event: $event" >&2
