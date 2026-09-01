@@ -42,7 +42,7 @@ export NO_PROXY="localhost,127.0.0.1,mirrors.ivolces.com,pypi.org,files.pythonho
 export PIP_INDEX_URL=https://mirrors.ivolces.com/pypi/simple
 ```
 
-# Codex Skills
+# 创建 Skill 规范
 
 创建或更新用户专属的 Codex Skill 时：
 
@@ -64,6 +64,12 @@ export PIP_INDEX_URL=https://mirrors.ivolces.com/pypi/simple
 3. 仅当 HDFS 可执行文件不存在或 HDFS 中不存在该模型时，才回退到从 Hugging Face 克隆模型仓库。
 
 先下载到同级临时目录，验证成功后再将其重命名到正式位置。如果 HDFS 显示模型存在，但 HDFS 下载失败，不要静默回退到 Hugging Face。
+
+# 代码仓库
+
+- 代码仓库放在 `~/workspace/github` 或者 `~/workspace/byted` 目录下。
+- 在临时服务上的任务如果需要执行 `~/workspace/github/chrome-review` 或者 `~/workspace/byted/ocean.ocean-benchmark` 中的代码，先检查远端代码和本地代码是否一致，用本地代码覆盖远端代码。
+- 对于代码仓库的修改，完成阶段性验证没问题后落到本地。然后提交一个 commit（临时文件和测试报告除外），commit 信息里面带上 "Co-authored-by: Codex <noreply@openai.com>"，不要 push。
 
 # 临时开发机器
 
