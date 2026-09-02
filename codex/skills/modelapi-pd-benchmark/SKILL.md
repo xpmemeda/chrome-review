@@ -65,6 +65,24 @@ python benchmark-dec.py --context-len 25000 --client modelapi --model omniagent_
 
 ## 结果交付
 
-- Prefill 的测试结果表格，不同 process 数量下的 uncached-prefill-tps。
-- Decode 的测试结果表格，不同 concurrency 数量下的 uncached-decode-tps。
-- 根据测试结果给出服务的 Prefill-Decode 数量配比。
+- Prefill 测试脚本输出的原始表格，不同 process 测试的表格都给出来。像下面这样。
+
+| scope                   | qps   | input_tokens | cached_tokens | cache_hit_rate | uncached_tps | avg_output_tokens | decode_tps |
+| ----------------------- | ----- | ------------ | ------------- | -------------- | ------------ | ----------------- | ---------- |
+| theoretical(prefix)     | 5.881 | 47012688     | 31752144      | 67.54%         | 47942.095    | N/A               | N/A        |
+| theoretical(stream_llm) | 5.881 | 47012688     | 36270000      | 77.15%         | 33748.926    | N/A               | N/A        |
+| actual(server)          | 5.881 | 47714368     | 0             | 0.00%          | 149898.114   | 1.0               | 119.470    |
+
+- Decode 的测试脚本输出的原始表格。像下面这样。
+
+| concurrency | qps   | tpot   | decode_tps | success_rate | success/total |
+| ----------- | ----- | ------ | ---------- | ------------ | ------------- |
+| 1           | 0.294 | 0.0108 | 85.4       | 100.00%      | 8/8           |
+| 16          | 2.814 | 0.0136 | 816.2      | 100.00%      | 64/64         |
+| 32          | 5.962 | 0.0148 | 1729.0     | 100.00%      | 128/128       |
+
+- 根据测试结果给出服务的 Prefill-Decode 数量配比表格。像下面这样。
+
+| uncached_tokens | uncached-prefill-TPS | prefill-QPS | output_tokens | decode-TPS | decode-QPS |
+| --------------- | -------------------- | ----------- | ------------- | ---------- | ---------- |
+| 5.74k           | 33748.93             | 5.881       | 290           | 1729.0     | 5.962      |
