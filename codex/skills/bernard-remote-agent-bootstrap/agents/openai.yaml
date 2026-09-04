@@ -1,0 +1,3 @@
+interface:
+  display_name: "Bernard Remote Agent 启动"
+  short_description: "按服务 Role 拓扑选择 Pod 并启动 remote-agent"
