@@ -103,11 +103,7 @@ export PIP_INDEX_URL=https://mirrors.ivolces.com/pypi/simple
 # 代码仓库
 
 - 代码仓库放在本地机器 `~/workspace/github` 或者 `~/workspace/byted` 目录下。
-- 在远程机器上执行 `~/workspace/github/chrome-review` 或者 `~/workspace/byted/ocean.ocean-benchmark` 中的代码
-  1. 如果远端无代码，则从本地拷贝到远程机器。
-  2. 如果远端有代码，则用本地代码覆盖远端代码。
-  3. 远端代码的存放路径也是 `~/workspace/github` 或者 `~/workspace/byted`，和本地一致，HOME 可以不一样。
-- 对于代码仓库的修改，完成阶段性验证没问题后落到本地。然后提交一个 commit（临时文件和测试报告除外），commit 信息里面带上 "Co-authored-by: Codex <noreply@openai.com>"，不要 push。
+- 提交 commit 时，信息里面带上 "Co-authored-by: Codex <noreply@openai.com>"，不要 push。
 
 # 本地执行环境
 

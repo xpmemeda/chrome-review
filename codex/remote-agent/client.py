@@ -25,8 +25,9 @@ class Client:
     def request(self, method: str, path: str, data=None, headers=None):
         request_headers = dict(headers or {})
         req = urllib.request.Request(self.url + path, data=data, headers=request_headers, method=method)
+        timeout = 3 if method == "GET" and path == "/v1/health" else 86400
         try:
-            return urllib.request.urlopen(req, timeout=86400, context=self.context)
+            return urllib.request.urlopen(req, timeout=timeout, context=self.context)
         except urllib.error.HTTPError as exc:
             body = exc.read().decode(errors="replace")
             raise SystemExit(f"HTTP {exc.code}: {body}") from None
