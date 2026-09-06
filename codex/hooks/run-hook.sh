@@ -2,6 +2,8 @@
 
 set -u
 
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
 event="${1:-}"
 if [[ -z "$event" ]]; then
   echo "run-hook.sh: missing hook event" >&2
@@ -52,7 +54,7 @@ case "$event" in
     ;;
   userPromptSubmit)
     run_step log-user-prompt 30 \
-      python3 "$HOME/workspace/github/chrome-review/codex/hooks/log_user_prompt.py"
+      python3 "$script_dir/log_user_prompt.py"
     ;;
   preToolUse)
     run_ai_report

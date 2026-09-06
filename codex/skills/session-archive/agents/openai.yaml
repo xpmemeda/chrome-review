@@ -1,0 +1,4 @@
+interface:
+  display_name: "会话归档"
+  short_description: "归档或追加会话状态，也可读取归档后继续工作"
+  default_prompt: "使用 $session-archive，把当前会话归档到我指定的文件，保留可供其他 agent 接手的状态。"

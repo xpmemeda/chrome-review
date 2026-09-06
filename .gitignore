@@ -16,4 +16,6 @@ __pycache__
 !.vscode
 !.zshrc
 
+!.agents
+!.codex
 !.codebuddy

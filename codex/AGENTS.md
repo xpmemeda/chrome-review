@@ -1,90 +1,42 @@
-# 远程机器
+# 回复要求
 
-## 登陆方式
+1. 输出表格的时候给我 markdown 原始字符串。
 
-用户可能以不同的方式提供机器。
+# 远程机器操作
 
-### 别称
+- 用户提到机器别名、远程登录、执行远程命令或传输文件时，优先使用 `remote_fleet` MCP。
+- 先调用 `list_hosts` 确认目标，再调用 `health` 检查连接。
 
-比如说 H20 / A100 / merlin-cc 之类的，非 IP 地址的名称，直接通过 `ssh <名称>` 登陆，登陆失败则在提示用户后终止对话。
+## 临时绕过 Bernard 重启还原配置
 
-### IPV6 地址
+- 不要把直接修改 `/etc/llmserver/config.yaml` 当作持久修改。无论执行 `bernard service restart` 还是直接 `systemctl restart lab.bernard.serving.service`，inferobust 启动时都可能重新生成该文件。
+- 还原链路位于 `/opt/tiger/inferobust/executor.py` 的 `init_multiple_files()`：它读取进程环境变量 `BERNARD_CONFIG`，将其中的 JSON/base64 内容解码，再按照 `LLMSERVER_CONFIG_PATH` 等环境变量指向的路径写回配置文件。
+- 排查时可以只列出 `BERNARD_CONFIG` 包含的键、目标路径和解码内容特征；不要直接打印完整环境变量，避免泄露 token、密码等敏感信息。
+- 正式方案是修改 Bernard 平台下发的配置，使 `BERNARD_CONFIG` 中的原始 YAML 包含目标字段。
+- 仅做临时服务实验、且暂时无法修改平台配置时，可以先备份 `/opt/tiger/inferobust/executor.py`，然后在 `init_multiple_files()` 中 `decoded_str = base64.b64decode(v).decode("utf-8")` 之后、写文件之前，按配置键注入修改。例如只处理 `k == "LLMSERVER_CONFIG_PATH"`，对 `decoded_str` 做精确替换。不要无条件修改所有下发文件。
+- 修改后先运行 `python3 -m py_compile /opt/tiger/inferobust/executor.py`，再使用 `bernard service restart`。重启完成后必须检查 `/etc/llmserver/config.yaml`，确认注入字段仍存在；配置通常在 executor 启动后才写入，过早检查可能看到短暂的旧版本。
+- 等 `/opt/tiger/toutiao/log/run/readiness.log.YYYY-MM-DD` 明确显示 pod ready、服务端口开始监听后，再发测试请求。仅看到 systemd `active (running)` 不代表模型已经可用。
+- 实验结束后恢复 `executor.py` 备份并再次重启。不要将这种运行时注入当作长期部署方案，也不要修改或回显 `/var/docker_environment` 中完整的 `BERNARD_CONFIG`。
 
-无法登陆，但是可以使用 `~/workspace/github/chrome-review/codex/remote-agent/client.py` 脚本来远程操控。
+# 资源地址
 
-```bash
-python3 client.py --url 'http://[IPV6]:18765' health
-python3 client.py --url 'http://[IPV6]:18765' exec --cwd /workspace -- COMMAND
-python3 client.py --url 'http://[IPV6]:18765' upload LOCAL_PATH REMOTE_PATH
-python3 client.py --url 'http://[IPV6]:18765' download REMOTE_PATH LOCAL_PATH
-```
+不论是本地机器还是通过 MCP 操作的远程机器，资源路径均遵守以下规则。
 
-- 先用 `health` 命令检测是否可连接，连接失败则在提示用户后终止对话。
-- 使用 `exec` 执行有边界的命令。
-- 使用 `start`、`status`、`logs` 和 `stop` 管理长时间运行的服务。
-- 记录 `start` 返回的每个 job ID，确保后续调用管理正确进程。
-
-## 环境
-
-在远程机器上工作时，先检测机器所属的网络集群并设置对应的代理环境变量，然后再运行需要访问网络的命令。
-
-大多数网络连接都需要代理，因此默认使用已配置的代理。部分地址可能无法通过代理访问。如果网络命令失败且可能由代理导致，仅针对该命令清除 `HTTP_PROXY`、`http_proxy`、`HTTPS_PROXY`、`https_proxy`、`ALL_PROXY` 和 `all_proxy` 后重试一次。不要在后续远程 shell 中永久取消代理变量。
-
-### 梅林
-
-如果以下命令执行成功，则将远程机器视为梅林的机器：
-
-```bash
-env | grep -q '^[^=]*MERLIN[^=]*='
-```
-
-在运行后续命令的同一个远程 shell 中设置以下变量：
-
-```bash
-export HTTP_PROXY=http://sys-proxy-rd-relay.byted.org:8118
-export http_proxy="${HTTP_PROXY}"
-export HTTPS_PROXY=http://sys-proxy-rd-relay.byted.org:8118
-export https_proxy="${HTTPS_PROXY}"
-export NO_PROXY="localhost,.byted.org,byted.org,.bytedance.net,bytedance.net,.byteintl.net,.tiktok-row.net,.tiktok-row.org,127.0.0.1,127.0.0.0/8,2605::/16"
-export no_proxy="${NO_PROXY}"
-```
-
-### 火山
-
-如果远程机器的主机名以 `di-` 开头，则将其视为火山的机器：
-
-```bash
-[[ "$(hostname)" == di-* ]]
-```
-
-在运行后续命令的同一个远程 shell 中设置以下变量：
-
-```bash
-export HTTP_PROXY="http://100.66.18.103:3128"
-export http_proxy=$HTTP_PROXY
-export HTTPS_PROXY="http://100.66.18.103:3128"
-export https_proxy=$HTTPS_PROXY
-export NO_PROXY="localhost,127.0.0.1,mirrors.ivolces.com,pypi.org,files.pythonhosted.org,pypi.python.org"
-export PIP_INDEX_URL=https://mirrors.ivolces.com/pypi/simple
-```
-
-## 资源地址
-
-### 服务日志
+## 日志
 
 根目录是 `/opt/tiger/toutiao/log/run`，有几个不同的日志文件：
 
 - `run/bernard_stdout_log.YYYYMMDD-0000`: 服务的外层启动与管理脚本输出，当容器只有一个服务时，这里也会有服务日志。
 - `executor_<N>.log.YYYY-MM-DD`: 当容器内部署了多个服务时，第 N 个服务的日志。
 
-### 模型文件
+## 模型文件
 
 模型文件通常存放在 `~/workspace/models` 下。下载所需模型前，先检查对应的本地目录是否已经存在且完整。未经用户确认，绝不覆盖非空或不完整的模型目录。
 
 当远程推理、服务、基准测试或开发任务需要本地尚不存在的模型时，使用 `model-artifact-fetch` Skill。数据源优先级如下：
 
 1. 复用完整的本地目录。
-2. 当 HDFS 可执行文件和模型路径都存在时，使用 `/opt/tiger/yarn_deploy/hadoop/bin/hdfs` 从内部 HDFS 根目录 `hdfs://haruna/home/byte_device_intelligence_model/xiongpeng.123` 下载。
+2. 当 HDFS 可执行文件和模型路径都存在时，使用 `/opt/tiger/hdfs_client/bin/hdfs` 或者 `/opt/tiger/yarn_deploy/hadoop/bin/hdfs` 从内部 HDFS 根目录 `hdfs://haruna/home/byte_device_intelligence_model/xiongpeng.123` 下载。
 3. 仅当 HDFS 可执行文件不存在或 HDFS 中不存在该模型时，才回退到从 Hugging Face 克隆模型仓库。
 
 先下载到同级临时目录，验证成功后再将其重命名到正式位置。如果 HDFS 显示模型存在，但 HDFS 下载失败，不要静默回退到 Hugging Face。
@@ -103,11 +55,12 @@ export PIP_INDEX_URL=https://mirrors.ivolces.com/pypi/simple
 # 代码仓库
 
 - 代码仓库放在本地机器 `~/workspace/github` 或者 `~/workspace/byted` 目录下。
-- 在远程机器上执行 `~/workspace/github/chrome-review` 或者 `~/workspace/byted/ocean.ocean-benchmark` 中的代码
-  1. 如果远端无代码，则从本地拷贝到远程机器。
-  2. 如果远端有代码，则用本地代码覆盖远端代码。
-  3. 远端代码的存放路径也是 `~/workspace/github` 或者 `~/workspace/byted`，和本地一致，HOME 可以不一样。
-- 对于代码仓库的修改，完成阶段性验证没问题后落到本地。然后提交一个 commit（临时文件和测试报告除外），commit 信息里面带上 "Co-authored-by: Codex <noreply@openai.com>"，不要 push。
+- 提交 commit 时，信息里面带上 "Co-authored-by: Codex <noreply@openai.com>"，不要 push。
+
+## 编写原则
+
+- 不用急着写测试和运行测试，先把功能实现了，用户 review 过后没问题会提示你去新增和运行测试。避免在不符合预期的实现上花费太长时间。
+- 注意模块化的功能划分。
 
 # 本地执行环境
 

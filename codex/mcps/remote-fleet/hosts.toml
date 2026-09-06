@@ -1,0 +1,147 @@
+[hosts.xzb]
+backend = "ssh"
+hostname = "14.103.241.208"
+port = 52972
+user = "root"
+identity_file = "/home/tiger/.ssh/id_rsa"
+known_hosts_file = "/home/tiger/.ssh/known_hosts"
+proxy = "sys-proxy-rd-relay.byted.org:8118"
+root = "/"
+
+[hosts.xzb.network_env]
+HTTP_PROXY = "http://100.66.18.103:3128"
+http_proxy = "http://100.66.18.103:3128"
+HTTPS_PROXY = "http://100.66.18.103:3128"
+https_proxy = "http://100.66.18.103:3128"
+NO_PROXY = "localhost,127.0.0.1,mirrors.ivolces.com,pypi.org,files.pythonhosted.org,pypi.python.org"
+no_proxy = "localhost,127.0.0.1,mirrors.ivolces.com,pypi.org,files.pythonhosted.org,pypi.python.org"
+PIP_INDEX_URL = "https://mirrors.ivolces.com/pypi/simple"
+
+[hosts.H20]
+backend = "ssh"
+hostname = "14.103.241.208"
+port = 6997
+user = "xiongpeng"
+identity_file = "/home/tiger/.ssh/id_rsa"
+known_hosts_file = "/home/tiger/.ssh/known_hosts"
+proxy = "sys-proxy-rd-relay.byted.org:8118"
+root = "/"
+
+[hosts.H20.network_env]
+HTTP_PROXY = "http://100.66.18.103:3128"
+http_proxy = "http://100.66.18.103:3128"
+HTTPS_PROXY = "http://100.66.18.103:3128"
+https_proxy = "http://100.66.18.103:3128"
+NO_PROXY = "localhost,127.0.0.1,mirrors.ivolces.com,pypi.org,files.pythonhosted.org,pypi.python.org"
+no_proxy = "localhost,127.0.0.1,mirrors.ivolces.com,pypi.org,files.pythonhosted.org,pypi.python.org"
+PIP_INDEX_URL = "https://mirrors.ivolces.com/pypi/simple"
+
+[hosts.A100x1]
+backend = "ssh"
+hostname = "14.103.241.208"
+port = 7732
+user = "root"
+identity_file = "/home/tiger/.ssh/id_rsa"
+known_hosts_file = "/home/tiger/.ssh/known_hosts"
+proxy = "sys-proxy-rd-relay.byted.org:8118"
+root = "/"
+
+[hosts.A100x1.network_env]
+HTTP_PROXY = "http://100.66.18.103:3128"
+http_proxy = "http://100.66.18.103:3128"
+HTTPS_PROXY = "http://100.66.18.103:3128"
+https_proxy = "http://100.66.18.103:3128"
+NO_PROXY = "localhost,127.0.0.1,mirrors.ivolces.com,pypi.org,files.pythonhosted.org,pypi.python.org"
+no_proxy = "localhost,127.0.0.1,mirrors.ivolces.com,pypi.org,files.pythonhosted.org,pypi.python.org"
+PIP_INDEX_URL = "https://mirrors.ivolces.com/pypi/simple"
+
+[hosts.xp]
+backend = "agent"
+url = "http://[2605:340:cd60:0:6bef:d7e1:cfb2:1d42]:18765"
+root = "/"
+
+[hosts.xp.network_env]
+HTTP_PROXY = "http://sys-proxy-rd-relay.byted.org:8118"
+http_proxy = "http://sys-proxy-rd-relay.byted.org:8118"
+HTTPS_PROXY = "http://sys-proxy-rd-relay.byted.org:8118"
+https_proxy = "http://sys-proxy-rd-relay.byted.org:8118"
+NO_PROXY = "localhost,.byted.org,byted.org,.bytedance.net,bytedance.net,.byteintl.net,.tiktok-row.net,.tiktok-row.org,127.0.0.1,127.0.0.0/8,2605::/16"
+no_proxy = "localhost,.byted.org,byted.org,.bytedance.net,bytedance.net,.byteintl.net,.tiktok-row.net,.tiktok-row.org,127.0.0.1,127.0.0.0/8,2605::/16"
+
+[hosts.zy]
+backend = "agent"
+url = "http://[2605:340:cd60::5d92:ae67:32f0]:18765"
+root = "/"
+
+[hosts.zy.network_env]
+HTTP_PROXY = "http://sys-proxy-rd-relay.byted.org:8118"
+http_proxy = "http://sys-proxy-rd-relay.byted.org:8118"
+HTTPS_PROXY = "http://sys-proxy-rd-relay.byted.org:8118"
+https_proxy = "http://sys-proxy-rd-relay.byted.org:8118"
+NO_PROXY = "localhost,.byted.org,byted.org,.bytedance.net,bytedance.net,.byteintl.net,.tiktok-row.net,.tiktok-row.org,127.0.0.1,127.0.0.0/8,2605::/16"
+no_proxy = "localhost,.byted.org,byted.org,.bytedance.net,bytedance.net,.byteintl.net,.tiktok-row.net,.tiktok-row.org,127.0.0.1,127.0.0.0/8,2605::/16"
+
+[hosts.xsc]
+backend = "agent"
+url = "http://[2605:340:cd51:5800:3e3:6724:9bff:ba11]:18765"
+root = "/"
+
+[hosts.xsc.network_env]
+HTTP_PROXY = "http://sys-proxy-rd-relay.byted.org:8118"
+http_proxy = "http://sys-proxy-rd-relay.byted.org:8118"
+HTTPS_PROXY = "http://sys-proxy-rd-relay.byted.org:8118"
+https_proxy = "http://sys-proxy-rd-relay.byted.org:8118"
+NO_PROXY = "localhost,.byted.org,byted.org,.bytedance.net,bytedance.net,.byteintl.net,.tiktok-row.net,.tiktok-row.org,127.0.0.1,127.0.0.0/8,2605::/16"
+no_proxy = "localhost,.byted.org,byted.org,.bytedance.net,bytedance.net,.byteintl.net,.tiktok-row.net,.tiktok-row.org,127.0.0.1,127.0.0.0/8,2605::/16"
+
+[hosts.xmy]
+backend = "agent"
+url = "http://[2605:340:cd51:5800:30a5:e554:8bd9:a10f]:18765"
+root = "/"
+
+[hosts.xmy.network_env]
+HTTP_PROXY = "http://sys-proxy-rd-relay.byted.org:8118"
+http_proxy = "http://sys-proxy-rd-relay.byted.org:8118"
+HTTPS_PROXY = "http://sys-proxy-rd-relay.byted.org:8118"
+https_proxy = "http://sys-proxy-rd-relay.byted.org:8118"
+NO_PROXY = "localhost,.byted.org,byted.org,.bytedance.net,bytedance.net,.byteintl.net,.tiktok-row.net,.tiktok-row.org,127.0.0.1,127.0.0.0/8,2605::/16"
+no_proxy = "localhost,.byted.org,byted.org,.bytedance.net,bytedance.net,.byteintl.net,.tiktok-row.net,.tiktok-row.org,127.0.0.1,127.0.0.0/8,2605::/16"
+
+[hosts.zth]
+backend = "agent"
+url = "http://[2605:340:cd51:4900:4393:c233:4f74:32fd]:18765"
+root = "/"
+
+[hosts.zth.network_env]
+HTTP_PROXY = "http://sys-proxy-rd-relay.byted.org:8118"
+http_proxy = "http://sys-proxy-rd-relay.byted.org:8118"
+HTTPS_PROXY = "http://sys-proxy-rd-relay.byted.org:8118"
+https_proxy = "http://sys-proxy-rd-relay.byted.org:8118"
+NO_PROXY = "localhost,.byted.org,byted.org,.bytedance.net,bytedance.net,.byteintl.net,.tiktok-row.net,.tiktok-row.org,127.0.0.1,127.0.0.0/8,2605::/16"
+no_proxy = "localhost,.byted.org,byted.org,.bytedance.net,bytedance.net,.byteintl.net,.tiktok-row.net,.tiktok-row.org,127.0.0.1,127.0.0.0/8,2605::/16"
+
+[hosts.lyl]
+backend = "agent"
+url = "http://[2605:340:cd51:4900:6b17:ec9f:9c84:833d]:18765"
+root = "/"
+
+[hosts.lyl.network_env]
+HTTP_PROXY = "http://sys-proxy-rd-relay.byted.org:8118"
+http_proxy = "http://sys-proxy-rd-relay.byted.org:8118"
+HTTPS_PROXY = "http://sys-proxy-rd-relay.byted.org:8118"
+https_proxy = "http://sys-proxy-rd-relay.byted.org:8118"
+NO_PROXY = "localhost,.byted.org,byted.org,.bytedance.net,bytedance.net,.byteintl.net,.tiktok-row.net,.tiktok-row.org,127.0.0.1,127.0.0.0/8,2605::/16"
+no_proxy = "localhost,.byted.org,byted.org,.bytedance.net,bytedance.net,.byteintl.net,.tiktok-row.net,.tiktok-row.org,127.0.0.1,127.0.0.0/8,2605::/16"
+
+[hosts.xss]
+backend = "agent"
+url = "http://[2605:340:cd51:4900:235b:882b:c323:eaa]:18765"
+root = "/"
+
+[hosts.xss.network_env]
+HTTP_PROXY = "http://sys-proxy-rd-relay.byted.org:8118"
+http_proxy = "http://sys-proxy-rd-relay.byted.org:8118"
+HTTPS_PROXY = "http://sys-proxy-rd-relay.byted.org:8118"
+https_proxy = "http://sys-proxy-rd-relay.byted.org:8118"
+NO_PROXY = "localhost,.byted.org,byted.org,.bytedance.net,bytedance.net,.byteintl.net,.tiktok-row.net,.tiktok-row.org,127.0.0.1,127.0.0.0/8,2605::/16"
+no_proxy = "localhost,.byted.org,byted.org,.bytedance.net,bytedance.net,.byteintl.net,.tiktok-row.net,.tiktok-row.org,127.0.0.1,127.0.0.0/8,2605::/16"

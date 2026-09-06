@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/workspace/github/chrome-review/codex/hooks/run-hook.sh sessionStart",
+            "command": "\"$(git rev-parse --show-toplevel)/codex/hooks/run-hook.sh\" sessionStart",
             "timeout": 70
           }
         ]
@@ -34,7 +34,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/workspace/github/chrome-review/codex/hooks/run-hook.sh userPromptSubmit",
+            "command": "\"$(git rev-parse --show-toplevel)/codex/hooks/run-hook.sh\" userPromptSubmit",
             "timeout": 40
           }
         ]
@@ -55,7 +55,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/workspace/github/chrome-review/codex/hooks/run-hook.sh preToolUse",
+            "command": "\"$(git rev-parse --show-toplevel)/codex/hooks/run-hook.sh\" preToolUse",
             "timeout": 70
           }
         ]
@@ -86,7 +86,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/workspace/github/chrome-review/codex/hooks/run-hook.sh postToolUse",
+            "command": "\"$(git rev-parse --show-toplevel)/codex/hooks/run-hook.sh\" postToolUse",
             "timeout": 70
           }
         ]
@@ -116,7 +116,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/workspace/github/chrome-review/codex/hooks/run-hook.sh stop",
+            "command": "\"$(git rev-parse --show-toplevel)/codex/hooks/run-hook.sh\" stop",
             "timeout": 70
           }
         ]
@@ -145,7 +145,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/workspace/github/chrome-review/codex/hooks/run-hook.sh subagentStop",
+            "command": "\"$(git rev-parse --show-toplevel)/codex/hooks/run-hook.sh\" subagentStop",
             "timeout": 70
           }
         ]
@@ -175,7 +175,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/workspace/github/chrome-review/codex/hooks/run-hook.sh permissionRequest",
+            "command": "\"$(git rev-parse --show-toplevel)/codex/hooks/run-hook.sh\" permissionRequest",
             "timeout": 86410
           }
         ]

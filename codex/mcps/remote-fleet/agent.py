@@ -8,6 +8,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import signal
 import socket
 import ssl
@@ -27,7 +28,12 @@ AGENT_PORT = 18765
 
 
 class AgentState:
-    def __init__(self, roots: list[Path], state_dir: Path, max_upload: int):
+    def __init__(
+        self,
+        roots: list[Path],
+        state_dir: Path,
+        max_upload: int | None,
+    ):
         self.roots = [path.expanduser().resolve() for path in roots]
         self.state_dir = state_dir.expanduser().resolve()
         self.logs_dir = self.state_dir / "jobs"
@@ -36,6 +42,7 @@ class AgentState:
         self.max_upload = max_upload
         self.jobs: dict[str, dict] = {}
         self.lock = threading.RLock()
+        self.path_locks: dict[str, threading.Lock] = {}
 
     def resolve_path(self, raw: str, *, must_exist: bool = False) -> Path:
         if not raw:
@@ -54,6 +61,11 @@ class AgentState:
         with self.lock:
             with self.audit_path.open("a", encoding="utf-8") as stream:
                 stream.write(line)
+
+    def path_lock(self, path: Path) -> threading.Lock:
+        key = str(path)
+        with self.lock:
+            return self.path_locks.setdefault(key, threading.Lock())
 
 
 class AgentServer(ThreadingHTTPServer):
@@ -122,6 +134,9 @@ class Handler(BaseHTTPRequestHandler):
             if parsed.path == "/v1/files":
                 self._download(parse_qs(parsed.query))
                 return
+            if parsed.path == "/v1/files/info":
+                self._file_info(parse_qs(parsed.query))
+                return
             parts = parsed.path.strip("/").split("/")
             if len(parts) in (3, 4) and parts[:2] == ["v1", "jobs"]:
                 if len(parts) == 4 and parts[3] != "logs":
@@ -129,7 +144,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._job_info(parts[2], logs=len(parts) == 4, query=parse_qs(parsed.query))
                 return
             self._error(HTTPStatus.NOT_FOUND, "endpoint not found")
-        except (ValueError, PermissionError, FileNotFoundError) as exc:
+        except (ValueError, PermissionError, FileNotFoundError, FileExistsError) as exc:
             self._error(HTTPStatus.BAD_REQUEST, str(exc))
         except Exception as exc:
             self.server.state.audit("internal_error", method="GET", path=self.path, error=repr(exc))
@@ -144,12 +159,15 @@ class Handler(BaseHTTPRequestHandler):
             if parsed.path == "/v1/jobs":
                 self._start_job(self._read_json())
                 return
+            if parsed.path == "/v1/files/finalize":
+                self._finalize_upload(self._read_json())
+                return
             parts = parsed.path.strip("/").split("/")
             if len(parts) == 4 and parts[:2] == ["v1", "jobs"] and parts[3] == "stop":
                 self._stop_job(parts[2])
                 return
             self._error(HTTPStatus.NOT_FOUND, "endpoint not found")
-        except (ValueError, PermissionError, FileNotFoundError) as exc:
+        except (ValueError, PermissionError, FileNotFoundError, FileExistsError) as exc:
             self._error(HTTPStatus.BAD_REQUEST, str(exc))
         except Exception as exc:
             self.server.state.audit("internal_error", method="POST", path=self.path, error=repr(exc))
@@ -158,6 +176,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_PUT(self) -> None:
         try:
             parsed = urlparse(self.path)
+            if parsed.path == "/v1/files/chunk":
+                self._upload_chunk(parse_qs(parsed.query))
+                return
             if parsed.path != "/v1/files":
                 self._error(HTTPStatus.NOT_FOUND, "endpoint not found")
                 return
@@ -252,6 +273,7 @@ class Handler(BaseHTTPRequestHandler):
             next_offset = stream.tell()
         self._json(HTTPStatus.OK, {
             **self._public_job(job), "offset": offset, "next_offset": next_offset,
+            "size": Path(job["log_path"]).stat().st_size,
             "log": data.decode("utf-8", errors="replace"),
         })
 
@@ -272,7 +294,10 @@ class Handler(BaseHTTPRequestHandler):
         raw_path = query.get("path", [""])[0]
         path = self.server.state.resolve_path(raw_path)
         length = int(self.headers.get("Content-Length", "0"))
-        if length < 0 or length > self.server.state.max_upload:
+        if length < 0 or (
+            self.server.state.max_upload is not None
+            and length > self.server.state.max_upload
+        ):
             raise ValueError("invalid or excessive upload size")
         expected = self.headers.get("X-Content-SHA256", "")
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -291,7 +316,8 @@ class Handler(BaseHTTPRequestHandler):
             actual = digest.hexdigest()
             if expected and not hmac.compare_digest(expected.lower(), actual):
                 raise ValueError("SHA-256 mismatch")
-            os.replace(temp, path)
+            with self.server.state.path_lock(path):
+                os.replace(temp, path)
         finally:
             temp.unlink(missing_ok=True)
         self.server.state.audit("upload", path=str(path), size=length, sha256=actual)
@@ -302,22 +328,142 @@ class Handler(BaseHTTPRequestHandler):
         if not path.is_file():
             raise ValueError("path is not a file")
         size = path.stat().st_size
-        self.send_response(HTTPStatus.OK)
+        offset = int(query.get("offset", ["0"])[0])
+        requested = query.get("limit", [None])[0]
+        limit = size - offset if requested is None else int(requested)
+        if offset < 0 or offset > size or limit < 0:
+            raise ValueError("invalid download offset or limit")
+        length = min(limit, size - offset)
+        self.send_response(HTTPStatus.PARTIAL_CONTENT if requested is not None else HTTPStatus.OK)
         self.send_header("Content-Type", "application/octet-stream")
-        self.send_header("Content-Length", str(size))
-        self.send_header("X-Content-SHA256", sha256_file(path))
+        self.send_header("Content-Length", str(length))
+        self.send_header("X-File-Size", str(size))
+        if requested is None:
+            self.send_header("X-Content-SHA256", sha256_file(path))
+        else:
+            end = offset + length - 1 if length else offset
+            self.send_header("Content-Range", f"bytes {offset}-{end}/{size}")
         self.end_headers()
         with path.open("rb") as stream:
-            while chunk := stream.read(COPY_CHUNK):
+            stream.seek(offset)
+            remaining = length
+            while remaining and (chunk := stream.read(min(COPY_CHUNK, remaining))):
                 self.wfile.write(chunk)
-        self.server.state.audit("download", path=str(path), size=size)
+                remaining -= len(chunk)
+        self.server.state.audit("download", path=str(path), offset=offset, size=length)
+
+    def _file_info(self, query: dict) -> None:
+        path = self.server.state.resolve_path(query.get("path", [""])[0])
+        if not path.exists():
+            self._json(HTTPStatus.OK, {"exists": False, "size": 0, "sha256": None})
+            return
+        if not path.is_file():
+            raise ValueError("path is not a file")
+        size = path.stat().st_size
+        raw_length = query.get("hash_length", [None])[0]
+        hash_length = None if raw_length is None else int(raw_length)
+        if hash_length is not None and not 0 <= hash_length <= size:
+            raise ValueError("invalid hash_length")
+        self._json(
+            HTTPStatus.OK,
+            {
+                "exists": True,
+                "size": size,
+                "sha256": sha256_file(path, hash_length),
+            },
+        )
+
+    def _upload_chunk(self, query: dict) -> None:
+        path = self.server.state.resolve_path(query.get("path", [""])[0])
+        offset = int(query.get("offset", ["-1"])[0])
+        length = int(self.headers.get("Content-Length", "0"))
+        if offset < 0 or length < 0 or (
+            self.server.state.max_upload is not None
+            and offset + length > self.server.state.max_upload
+        ):
+            raise ValueError("invalid upload offset or chunk size")
+        expected = self.headers.get("X-Content-SHA256", "").lower()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        digest = hashlib.sha256()
+        remaining = length
+        with self.server.state.path_lock(path):
+            current = path.stat().st_size if path.exists() else 0
+            if current != offset:
+                raise ValueError(f"partial size mismatch: {current} != {offset}")
+            try:
+                with path.open("ab") as stream:
+                    while remaining:
+                        chunk = self.rfile.read(min(COPY_CHUNK, remaining))
+                        if not chunk:
+                            raise ValueError("upload ended early")
+                        stream.write(chunk)
+                        digest.update(chunk)
+                        remaining -= len(chunk)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                actual = digest.hexdigest()
+                if expected and not hmac.compare_digest(expected, actual):
+                    raise ValueError("chunk SHA-256 mismatch")
+            except Exception:
+                with path.open("r+b") as stream:
+                    stream.truncate(offset)
+                raise
+        size = path.stat().st_size
+        self.server.state.audit("upload_chunk", path=str(path), offset=offset, size=length)
+        self._json(HTTPStatus.CREATED, {"path": str(path), "size": size, "sha256": actual})
+
+    def _finalize_upload(self, body: dict) -> None:
+        partial = self.server.state.resolve_path(str(body.get("partial_path", "")), must_exist=True)
+        destination = self.server.state.resolve_path(str(body.get("path", "")))
+        size = int(body.get("size", -1))
+        expected = str(body.get("sha256", "")).lower()
+        overwrite = bool(body.get("overwrite", False))
+        if partial != Path(str(destination) + ".partial"):
+            raise ValueError("partial_path must be '<path>.partial'")
+        if size < 0 or (
+            self.server.state.max_upload is not None
+            and size > self.server.state.max_upload
+        ):
+            raise ValueError("invalid or excessive upload size")
+        if not re.fullmatch(r"[0-9a-f]{64}", expected):
+            raise ValueError("invalid SHA-256")
+        with self.server.state.path_lock(partial):
+            if not partial.is_file() or partial.stat().st_size != size:
+                raise ValueError("upload size mismatch")
+            actual = sha256_file(partial)
+            if not hmac.compare_digest(expected, actual):
+                raise ValueError("upload SHA-256 mismatch")
+            with self.server.state.path_lock(destination):
+                if destination.exists() and not overwrite:
+                    raise FileExistsError(f"destination already exists: {destination}")
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(partial, destination)
+        self.server.state.audit(
+            "upload_finalize",
+            path=str(destination),
+            size=size,
+            sha256=actual,
+        )
+        self._json(
+            HTTPStatus.CREATED,
+            {"path": str(destination), "size": size, "sha256": actual},
+        )
 
 
-def sha256_file(path: Path) -> str:
+def sha256_file(path: Path, limit: int | None = None) -> str:
     digest = hashlib.sha256()
+    remaining = limit
     with path.open("rb") as stream:
-        while chunk := stream.read(COPY_CHUNK):
+        while remaining is None or remaining > 0:
+            read_size = COPY_CHUNK if remaining is None else min(COPY_CHUNK, remaining)
+            chunk = stream.read(read_size)
+            if not chunk:
+                break
             digest.update(chunk)
+            if remaining is not None:
+                remaining -= len(chunk)
+    if remaining not in (None, 0):
+        raise ValueError("file ended before requested hash length")
     return digest.hexdigest()
 
 
@@ -326,7 +472,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--host", default="::", help="listen address; defaults to all IPv6 interfaces")
     parser.add_argument("--root", action="append", default=[], help="allowed filesystem root; repeatable")
     parser.add_argument("--state-dir", default="~/.local/state/dev-agent")
-    parser.add_argument("--max-upload-gib", type=float, default=20)
+    parser.add_argument(
+        "--max-upload-gib",
+        type=float,
+        default=0,
+        help="maximum finalized upload size; 0 means unlimited",
+    )
     parser.add_argument("--tls-cert")
     parser.add_argument("--tls-key")
     args = parser.parse_args()
@@ -338,7 +489,14 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     roots = [Path(value) for value in args.root] or [Path.cwd()]
-    state = AgentState(roots, Path(args.state_dir), int(args.max_upload_gib * 1024**3))
+    if args.max_upload_gib < 0:
+        raise SystemExit("--max-upload-gib must be non-negative")
+    max_upload = (
+        int(args.max_upload_gib * 1024**3)
+        if args.max_upload_gib
+        else None
+    )
+    state = AgentState(roots, Path(args.state_dir), max_upload)
     server = AgentServer((args.host, AGENT_PORT), Handler, state)
     scheme = "http"
     if args.tls_cert:

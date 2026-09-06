@@ -1,0 +1,3 @@
+interface:
+  display_name: "Grafana 看板编辑"
+  short_description: "编辑现有看板的布局、指标聚合与显示格式，保存后核验实际数据"
