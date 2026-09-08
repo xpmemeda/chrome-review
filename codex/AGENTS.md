@@ -105,6 +105,11 @@ export PIP_INDEX_URL=https://mirrors.ivolces.com/pypi/simple
 - 代码仓库放在本地机器 `~/workspace/github` 或者 `~/workspace/byted` 目录下。
 - 提交 commit 时，信息里面带上 "Co-authored-by: Codex <noreply@openai.com>"，不要 push。
 
+## 编写原则
+
+- 不用急着写测试和运行测试，先把功能实现了，用户 review 过后没问题会提示你去新增和运行测试。避免在不符合预期的实现上花费太长时间。
+- 注意模块化的功能划分。
+
 # 本地执行环境
 
 - 使用交互式 zsh 加载用户环境，比如 `zsh -ic 'python ...'`
