@@ -88,7 +88,7 @@ export PIP_INDEX_URL=https://mirrors.ivolces.com/pypi/simple
 当远程推理、服务、基准测试或开发任务需要本地尚不存在的模型时，使用 `model-artifact-fetch` Skill。数据源优先级如下：
 
 1. 复用完整的本地目录。
-2. 当 HDFS 可执行文件和模型路径都存在时，使用 `/opt/tiger/yarn_deploy/hadoop/bin/hdfs` 从内部 HDFS 根目录 `hdfs://haruna/home/byte_device_intelligence_model/xiongpeng.123` 下载。
+2. 当 HDFS 可执行文件和模型路径都存在时，使用 `/opt/tiger/hdfs_client/bin/hdfs` 或者 `/opt/tiger/yarn_deploy/hadoop/bin/hdfs` 从内部 HDFS 根目录 `hdfs://haruna/home/byte_device_intelligence_model/xiongpeng.123` 下载。
 3. 仅当 HDFS 可执行文件不存在或 HDFS 中不存在该模型时，才回退到从 Hugging Face 克隆模型仓库。
 
 先下载到同级临时目录，验证成功后再将其重命名到正式位置。如果 HDFS 显示模型存在，但 HDFS 下载失败，不要静默回退到 Hugging Face。
