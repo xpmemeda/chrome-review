@@ -1,0 +1,4 @@
+interface:
+  display_name: "会话交接"
+  short_description: "保存长对话的目标、决策、验证证据与远程现场，让新对话核对后继续工作"
+  default_prompt: "使用 $session-handoff 整理当前任务的交接摘要、远程现场和下一步，并生成新对话的接手提示词。"
