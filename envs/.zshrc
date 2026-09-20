@@ -13,7 +13,6 @@ SCRIPT_DIR=$(dirname $(realpath ${HOME}/.zshrc))
 if [[ "$(uname -s)" == "Darwin" ]]; then
     if [ "$SCRIPT_DIR" != "$HOME" ]; then
         source $SCRIPT_DIR/Darwin/init-alias.sh
-        source $SCRIPT_DIR/init-codex.sh
         source $SCRIPT_DIR/Darwin/init-vscode.sh
     fi
     return
@@ -26,7 +25,6 @@ if [[ "$(uname -s)" == "Linux" ]]; then
         source $SCRIPT_DIR/Linux/init-xlib-env.sh
         source $SCRIPT_DIR/Linux/init-tencent-env.sh
         source $SCRIPT_DIR/Linux/init-byted-env.sh
-        source $SCRIPT_DIR/init-codex.sh
         source $SCRIPT_DIR/Linux/init-trae.sh
         source $SCRIPT_DIR/Linux/init-vscode.sh
     fi
