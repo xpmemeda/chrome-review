@@ -13,7 +13,6 @@ import re
 import shlex
 import ssl
 import subprocess
-import tempfile
 import threading
 import time
 import tomllib
@@ -21,7 +20,6 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
-import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -45,12 +43,6 @@ class HostConfig:
     ssh_alias: str
     proxy: str | None
     root: str
-    ssh_archive: Path | None = None
-    hostname: str | None = None
-    user: str | None = None
-    port: int | None = None
-    identity_file: Path | None = None
-    known_hosts_file: Path | None = None
     url: str | None = None
     insecure: bool = False
     network_env: dict[str, str] = field(default_factory=dict)
@@ -59,17 +51,25 @@ class HostConfig:
 def load_hosts(path: Path) -> dict[str, HostConfig]:
     with path.open("rb") as stream:
         raw = tomllib.load(stream)
+    network_profiles = raw.get("network_profiles", {})
+    if not isinstance(network_profiles, dict):
+        raise ValueError("network_profiles must be a table")
     hosts: dict[str, HostConfig] = {}
     for name, item in raw.get("hosts", {}).items():
-        backend = item.get("backend", "ssh_archive")
-        if backend not in {"ssh", "ssh_archive", "agent"}:
+        profile_name = item.get("network_profile")
+        profile_env: dict[str, Any] = {}
+        if profile_name is not None:
+            if not isinstance(profile_name, str) or profile_name not in network_profiles:
+                raise ValueError(
+                    f"host {name!r}: unknown network profile {profile_name!r}"
+                )
+            profile_env = network_profiles[profile_name]
+            if not isinstance(profile_env, dict):
+                raise ValueError(f"network profile {profile_name!r} must be a table")
+        network_env = {**profile_env, **item.get("network_env", {})}
+        backend = item.get("backend", "ssh")
+        if backend not in {"ssh", "agent"}:
             raise ValueError(f"host {name!r}: unsupported backend {backend!r}")
-        if backend == "ssh_archive" and not item.get("ssh_archive"):
-            raise ValueError(f"host {name!r}: ssh_archive is required")
-        if backend == "ssh" and not item.get("hostname"):
-            raise ValueError(f"host {name!r}: hostname is required")
-        if backend == "ssh" and not item.get("identity_file"):
-            raise ValueError(f"host {name!r}: identity_file is required")
         if backend == "agent" and not item.get("url"):
             raise ValueError(f"host {name!r}: url is required")
         if backend == "agent":
@@ -87,168 +87,30 @@ def load_hosts(path: Path) -> dict[str, HostConfig]:
             ssh_alias=item.get("ssh_alias", name),
             proxy=item.get("proxy"),
             root=root,
-            ssh_archive=(
-                Path(item["ssh_archive"]).expanduser()
-                if item.get("ssh_archive")
-                else None
-            ),
-            hostname=item.get("hostname"),
-            user=item.get("user"),
-            port=int(item["port"]) if item.get("port") is not None else None,
-            identity_file=(
-                Path(item["identity_file"]).expanduser()
-                if item.get("identity_file")
-                else None
-            ),
-            known_hosts_file=(
-                Path(item["known_hosts_file"]).expanduser()
-                if item.get("known_hosts_file")
-                else None
-            ),
             url=item.get("url"),
             insecure=bool(item.get("insecure", False)),
-            network_env={str(k): str(v) for k, v in item.get("network_env", {}).items()},
+            network_env={str(k): str(v) for k, v in network_env.items()},
         )
     if not hosts:
         raise ValueError(f"no hosts configured in {path}")
     return hosts
 
 
-class SSHArchiveSession:
-    def __init__(self, host: HostConfig):
-        self.host = host
-        if host.ssh_archive is None:
-            raise ValueError(f"host {host.name!r}: ssh_archive is required")
-        self._temp = tempfile.TemporaryDirectory(prefix=f"remote-fleet-{host.name}-")
-        root = Path(self._temp.name)
-        with zipfile.ZipFile(host.ssh_archive) as archive:
-            archive.extractall(root)
-        configs = sorted(root.rglob("config"), key=lambda p: (p.parent.name != ".ssh", len(p.parts)))
-        if not configs:
-            raise ValueError(f"{host.ssh_archive}: SSH config not found")
-        self.config = configs[0]
-        self.config.chmod(0o600)
-        self.keys = self._resolve_keys(root)
-        if not self.keys:
-            raise ValueError(f"{host.ssh_archive}: no private key found")
-        known_hosts = list(root.rglob("known_hosts"))
-        self.known_hosts = known_hosts[0] if known_hosts else root / "known_hosts"
-        if not self.known_hosts.exists():
-            self.known_hosts.touch(mode=0o600)
-
-    def _resolve_keys(self, root: Path) -> list[Path]:
-        candidates: list[Path] = []
-        for line in self.config.read_text(errors="replace").splitlines():
-            parts = shlex.split(line, comments=True)
-            if len(parts) >= 2 and parts[0].lower() == "identityfile":
-                configured = Path(parts[1])
-                if not configured.is_absolute() and not parts[1].startswith("~"):
-                    candidates.append(self.config.parent / configured)
-                else:
-                    candidates.append(Path(os.path.expanduser(parts[1])))
-                candidates.extend(root.rglob(configured.name))
-        candidates.extend(
-            path
-            for path in root.rglob("id_*")
-            if not path.name.endswith(".pub")
-        )
-        result: list[Path] = []
-        for path in candidates:
-            if path.is_file() and not path.name.endswith(".pub") and path not in result:
-                path.chmod(0o600)
-                result.append(path)
-        return result
-
-    def _argv(self) -> list[str]:
-        argv = [
-            "ssh",
-            "-F",
-            str(self.config),
-            "-o",
-            "BatchMode=yes",
-            "-o",
-            "ConnectTimeout=20",
-            "-o",
-            "IdentitiesOnly=yes",
-            "-o",
-            f"UserKnownHostsFile={self.known_hosts}",
-            "-o",
-            "StrictHostKeyChecking=accept-new",
-        ]
-        if self.host.proxy:
-            argv += [
-                "-o",
-                f"ProxyCommand=nc -X connect -x {self.host.proxy} %h %p",
-            ]
-        for key in self.keys:
-            argv += ["-i", str(key)]
-        return argv + [self.host.ssh_alias]
-
-    def run(
-        self,
-        command: str,
-        *,
-        timeout: float | None = 300,
-        input_data: bytes | None = None,
-    ) -> subprocess.CompletedProcess[bytes]:
-        return subprocess.run(
-            self._argv() + [command],
-            input=input_data,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=timeout,
-            check=False,
-        )
-
-
 class SSHSession:
     def __init__(self, host: HostConfig):
         self.host = host
-        if not host.hostname or not host.identity_file:
-            raise ValueError(
-                f"host {host.name!r}: hostname and identity_file are required"
-            )
-        if not host.identity_file.is_file():
-            raise ValueError(f"identity file not found: {host.identity_file}")
-        if host.known_hosts_file and not host.known_hosts_file.is_file():
-            raise ValueError(
-                f"known hosts file not found: {host.known_hosts_file}"
-            )
 
     def _argv(self) -> list[str]:
-        argv = [
+        return [
             "ssh",
             "-F",
-            "/dev/null",
+            str(Path.home() / ".ssh" / "config"),
             "-o",
             "BatchMode=yes",
             "-o",
             "ConnectTimeout=20",
-            "-o",
-            "IdentitiesOnly=yes",
-            "-i",
-            str(self.host.identity_file),
+            self.host.ssh_alias,
         ]
-        if self.host.known_hosts_file:
-            argv += [
-                "-o",
-                f"UserKnownHostsFile={self.host.known_hosts_file}",
-                "-o",
-                "StrictHostKeyChecking=yes",
-            ]
-        else:
-            argv += ["-o", "StrictHostKeyChecking=accept-new"]
-        if self.host.proxy:
-            argv += [
-                "-o",
-                f"ProxyCommand=nc -X connect -x {self.host.proxy} %h %p",
-            ]
-        if self.host.port:
-            argv += ["-p", str(self.host.port)]
-        destination = self.host.hostname
-        if self.host.user:
-            destination = f"{self.host.user}@{destination}"
-        return argv + [destination]
 
     def run(
         self,
@@ -478,7 +340,7 @@ class RemoteFleet:
         self.config_path = config_path
         self._config_lock = threading.RLock()
         self.hosts = load_hosts(config_path)
-        self.sessions: dict[str, SSHArchiveSession | SSHSession | AgentSession] = {}
+        self.sessions: dict[str, SSHSession | AgentSession] = {}
         self._config_signature = self._read_config_signature()
 
     def _read_config_signature(self) -> tuple[int, int, int, int]:
@@ -513,7 +375,7 @@ class RemoteFleet:
                 )
             return self.hosts[name]
 
-    def session(self, name: str) -> SSHArchiveSession | SSHSession | AgentSession:
+    def session(self, name: str) -> SSHSession | AgentSession:
         self.reload_if_changed()
         with self._config_lock:
             if name not in self.hosts:
@@ -522,9 +384,7 @@ class RemoteFleet:
                 )
             host = self.hosts[name]
             if name not in self.sessions:
-                if host.backend == "ssh_archive":
-                    self.sessions[name] = SSHArchiveSession(host)
-                elif host.backend == "agent":
+                if host.backend == "agent":
                     self.sessions[name] = AgentSession(host)
                 else:
                     self.sessions[name] = SSHSession(host)
@@ -751,7 +611,7 @@ class TransferManager:
 
     @staticmethod
     def _remote_python(
-        session: SSHArchiveSession | SSHSession,
+        session: SSHSession,
         source: str,
         data: bytes | None = None,
         timeout: float = TRANSFER_REQUEST_TIMEOUT,
@@ -767,7 +627,7 @@ class TransferManager:
 
     def _remote_info(
         self,
-        session: SSHArchiveSession | SSHSession | AgentSession,
+        session: SSHSession | AgentSession,
         path: str,
         hash_length: int | None = None,
     ) -> dict[str, Any]:
@@ -817,7 +677,7 @@ print(json.dumps({{"exists": exists, "size": size, "sha256": digest.hexdigest() 
 
     def _download_chunk(
         self,
-        session: SSHArchiveSession | SSHSession | AgentSession,
+        session: SSHSession | AgentSession,
         path: str,
         offset: int,
         limit: int,
@@ -833,7 +693,7 @@ print(json.dumps({{"exists": exists, "size": size, "sha256": digest.hexdigest() 
 
     def _append_remote(
         self,
-        session: SSHArchiveSession | SSHSession | AgentSession,
+        session: SSHSession | AgentSession,
         path: str,
         offset: int,
         data: bytes,
@@ -1141,6 +1001,7 @@ def create_server(
         "remote_fleet",
         host=host,
         port=port,
+        stateless_http=True,
         instructions=(
             "统一管理配置中的远程机器。先用 list_hosts/health 确认目标；短命令用 exec，"
             "长任务用 start_job 并保留完整 job_ref。文件传输是异步、可续传任务，"

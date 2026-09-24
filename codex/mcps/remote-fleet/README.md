@@ -64,22 +64,38 @@ in-memory registry, so keep the agent running while managing them.
 ## 3. Unified MCP server
 
 `mcp_server.py` presents SSH and HTTP-agent machines through one local MCP
-server. Each machine is declared in a TOML registry. The preferred `ssh`
-backend uses an explicit hostname, user, port, local identity file, and
-known-hosts file. The legacy `ssh_archive` backend reads an SSH config and
-private key from a zip archive, expands it into a process-private temporary
-directory, and removes it when the MCP process exits. Both SSH backends can
-connect through an HTTP CONNECT proxy.
+server. Each machine is declared in a TOML registry. The `ssh` backend uses
+an alias from `~/.ssh/config`, including its hostname, user, port, key,
+known-hosts policy, and proxy settings. The registry name is the SSH alias by
+default; set `ssh_alias` only when they differ:
+
+```toml
+[hosts.dev_ssh]
+backend = "ssh"
+ssh_alias = "dev-box"
+root = "/"
+```
+
+The corresponding `Host dev-box` entry belongs in `~/.ssh/config`.
 
 To register a machine running `agent.py`, add an `agent` entry. Its `root`
 must be one of the roots allowed by the agent (or a directory below one):
 
 ```toml
+[network_profiles.merlin]
+HTTPS_PROXY = "http://proxy.example:8118"
+
 [hosts.dev_agent]
 backend = "agent"
 url = "http://[2408:xxxx:xxxx::1234]:18765"
 root = "/home/user/workspace"
+network_profile = "merlin"
 ```
+
+Define shared command environment variables in `[network_profiles.<name>]`.
+Hosts select a profile with `network_profile`; optional per-host `network_env`
+entries override individual values from that profile. The profile is injected
+only when a command or job uses `network=true`.
 
 For HTTPS with a development certificate, `insecure = true` disables
 certificate verification. Do not use it for a trusted production endpoint.

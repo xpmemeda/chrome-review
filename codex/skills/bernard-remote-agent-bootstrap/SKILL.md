@@ -33,5 +33,5 @@ tmux new-session -d -s remote-agent 'python3 /tmp/chrome-review-agent.py --root 
 ## 验证并登记到 remote_fleet
 
 1. 从本机验证 `http://[<IPv6>]:18765/v1/health`，确认 `ok`、hostname、PID 和 `roots: ["/"]`；启动可能包含安装与下载，给出合理等待时间，失败时读 tmux 输出。
-2. 在本地 `codex/mcps/remote-fleet/hosts.toml` 为每个已就绪实例加唯一主机名，`backend = "agent"`、`url = "http://[<IPv6>]:18765"`、`root = "/"`，`network_env` 复制现有 agent 主机的配置。保留用户对该文件的其他改动。
+2. 在本地 `codex/mcps/remote-fleet/hosts.toml` 为每个已就绪实例加唯一主机名，`backend = "agent"`、`url = "http://[<IPv6>]:18765"`、`root = "/"`、`network_profile = "merlin"`。保留用户对该文件的其他改动。
 3. 调用 remote_fleet 的 `list_hosts` 确认新主机，再调用 `health` 验证连接。报告实际启动、复用与失败的主机，列出 IPv6、角色和 Pod name。
