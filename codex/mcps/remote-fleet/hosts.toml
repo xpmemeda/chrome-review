@@ -15,7 +15,21 @@ https_proxy = "http://sys-proxy-rd-relay.byted.org:8118"
 NO_PROXY = "localhost,.byted.org,byted.org,.bytedance.net,bytedance.net,.byteintl.net,.tiktok-row.net,.tiktok-row.org,127.0.0.1,127.0.0.0/8,2605::/16"
 no_proxy = "localhost,.byted.org,byted.org,.bytedance.net,bytedance.net,.byteintl.net,.tiktok-row.net,.tiktok-row.org,127.0.0.1,127.0.0.0/8,2605::/16"
 
+[hosts.bwg]
+backend = "ssh"
+root = "/"
+
 [hosts.xzb]
+backend = "ssh"
+network_profile = "volcano"
+root = "/"
+
+[hosts.zth]
+backend = "ssh"
+network_profile = "volcano"
+root = "/"
+
+[hosts.rsh]
 backend = "ssh"
 network_profile = "volcano"
 root = "/"
@@ -33,35 +47,83 @@ root = "/"
 [hosts.xp]
 backend = "agent"
 network_profile = "merlin"
-url = "http://[2605:340:cd60:0:6bef:d7e1:cfb2:1d42]:18765"
+url = "http://[2605:340:cd51:4900:e3cd:a480:5dc4:e21e]:18765"
 root = "/"
 
 [hosts.zy]
 backend = "agent"
 network_profile = "merlin"
-url = "http://[2605:340:cd60::5d92:ae67:32f0]:18765"
+url = "http://[2605:340:cd51:4900:79d7:7ca2:f91b:ee04]:18765"
 root = "/"
 
 [hosts.xsc]
 backend = "agent"
 network_profile = "merlin"
-url = "http://[2605:340:cd51:5800:3e3:6724:9bff:ba11]:18765"
+url = "http://[2605:340:cd60:0:40e6:1798:49b0:88c8]:18765"
 root = "/"
 
 [hosts.xmy]
 backend = "agent"
 network_profile = "merlin"
-url = "http://[2605:340:cd51:5800:30a5:e554:8bd9:a10f]:18765"
+url = "http://[2605:340:cd60:0:7cf6:1b2:8c0:b2ce]:18765"
 root = "/"
 
-[hosts.zth]
+[hosts.xxx]
 backend = "agent"
 network_profile = "merlin"
-url = "http://[2605:340:cd51:4900:4393:c233:4f74:32fd]:18765"
+url = "http://[2605:340:cd60:0:2865:dbfb:1b0d:e467]:18765"
 root = "/"
 
-[hosts.lyl]
+[hosts.xzz]
 backend = "agent"
 network_profile = "merlin"
-url = "http://[2605:340:cd51:4900:6b17:ec9f:9c84:833d]:18765"
+url = "http://[2605:340:cd60::e15e:6d24:5dcc]:18765"
+root = "/"
+
+[hosts.xpbench]
+backend = "agent"
+network_profile = "merlin"
+url = "http://[2605:340:cd51:5800:5fd1:b429:2d4:f72a]:18765"
+root = "/"
+
+[hosts.xpbench2]
+backend = "agent"
+network_profile = "merlin"
+url = "http://[2605:340:cd51:4900:5823:8cf1:c40b:96d9]:18765"
+root = "/"
+
+[hosts.sglang-dev]
+backend = "agent"
+network_profile = "merlin"
+url = "http://[2605:340:cd51:4900:3a4:a2bb:d3b1:e442]:18765"
+root = "/"
+
+[hosts.sglang-dev-2nd]
+backend = "agent"
+network_profile = "merlin"
+url = "http://[2605:340:cd51:4900:395d:b98e:7bf1:e4f4]:18765"
+root = "/"
+
+[hosts.xpdev-l20]
+backend = "agent"
+network_profile = "merlin"
+url = "http://[2605:340:cd51:4900:ebf:e2b9:f1bf:bc69]:18765"
+root = "/"
+
+[hosts.xpdev-910b2]
+backend = "agent"
+network_profile = "merlin"
+url = "http://[2605:340:cd51:4900:5582:845b:b7f1:16a]:18765"
+root = "/"
+
+[hosts.xpdev-2nd]
+backend = "agent"
+network_profile = "merlin"
+url = "http://[2605:340:cd51:8700:0:2417:81be:f95b]:18765"
+root = "/"
+
+[hosts.cot-h20]
+backend = "agent"
+network_profile = "merlin"
+url = "http://[2605:340:cd51:5800:d4bf:17ca:b79b:a772]:18765"
 root = "/"

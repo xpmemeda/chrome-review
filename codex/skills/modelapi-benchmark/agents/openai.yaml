@@ -1,4 +1,4 @@
 interface:
-  display_name: "ModelAPI PD 性能测试"
-  short_description: "测试 ModelAPI Prefill 与 Decode 节点性能"
-  default_prompt: "使用 $modelapi-pd-benchmark 测试指定模型的 Prefill 和 Decode 性能。"
+  display_name: "推理服务 PD 性能测试"
+  short_description: "通过 ModelAPI 或 llmhub 测试 PD 分离与混合服务性能"
+  default_prompt: "使用 $modelapi-benchmark 压测指定的 ModelAPI 或 llmhub 服务。"
