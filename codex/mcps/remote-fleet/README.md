@@ -1,166 +1,171 @@
-# Remote development agent
+# remote_fleet
 
-This directory contains a small HTTP agent for development
-machines that are reachable from a Mac but cannot be accessed with SSH. It uses
-only the Python standard library.
+One MCP server, three ways to reach a target machine. Pick by network:
 
-## 1. Start the agent on the development machine
+| backend | when | discovery | who connects |
+|---|---|---|---|
+| `ssh` | work machine can SSH to target | `hosts.toml` alias | work → target |
+| `agent` | target reachable, work machine has no public IP | `hosts.toml` url | work → `direct_agent.py` |
+| `reverse` | work machine has a public IP, target is not reachable | self-registration | `reverse_agent.py` → work |
 
-On the development machine:
+`direct_agent.py` and `reverse_agent.py` are standalone single files (stdlib
+only, Python 3.8+) that serve the same agent API; `client.py` is a CLI for a
+direct agent.
+
+```
+reverse_agent.py <name> ── long poll ──▶ rendezvous [::]:18765 (public) ┐
+direct_agent.py :18765  ◀── HTTP ──────────────────────────────────────┤ mcp_server.py
+ssh target              ◀── ssh ───────────────────────────────────────┘ 127.0.0.1:18766/mcp ◀── Codex / Claude
+```
+
+## 1. Run the MCP server on the work machine
 
 ```bash
-python3 agent.py \
-  --root ~/workspace \
-  --root ~/workspace/models
+python3 -m pip install "mcp<2"       # Python 3.11+; v2 renamed FastMCP
+python3 mcp_server.py               # MCP on 127.0.0.1:18766, rendezvous on [::]:18765
 ```
 
-The agent listens on all IPv6 interfaces (`::`) using the fixed port `18765`.
-To bind one specific address, pass `--host '<ipv6-address>'`. To use IPv4
-instead, pass `--host 0.0.0.0`.
+Options: `--host/--port` for the MCP endpoint, `--rendezvous-host/--rendezvous-port`
+for the reverse-agent listener (`::` accepts both IPv6 and IPv4 clients;
+`--rendezvous-port 0` disables reverse agents, e.g. on a machine without a
+public IP). Open only the rendezvous port in the firewall; keep the MCP port
+local.
 
-`--root` is repeatable. Commands may only use a working directory below an
-allowed root, and file uploads/downloads are confined to those roots. Relative
-paths are resolved below the first root.
+A systemd unit keeps it running:
 
-Find the machine IP with `hostname -I` or the company's machine information
-page. Ensure the host firewall only permits the Mac or trusted office network.
+```ini
+# /etc/systemd/system/remote-fleet.service
+[Unit]
+Description=remote_fleet MCP server
+After=network-online.target
 
-The agent intentionally has no authentication. Anyone who can reach port
-`18765` can execute commands with the permissions of the agent process. Use it
-only on a disposable debugging machine and restrict inbound access with the
-host firewall. TLS can encrypt traffic but does not add authentication here.
+[Service]
+WorkingDirectory=/path/to/chrome-review/codex/mcps/remote-fleet
+ExecStart=/usr/bin/python3 mcp_server.py
+Restart=always
+RestartSec=3
 
-## 2. Use it from the Mac
-
-```bash
-export DEV_AGENT_URL='http://[2408:xxxx:xxxx::1234]:18765'
-
-python3 client.py health
-python3 client.py exec --cwd /home/user/workspace -- nvidia-smi
-python3 client.py upload ./server.py /home/user/workspace/server.py
-python3 client.py download /home/user/workspace/result.json ./result.json
-```
-
-Multiple command arguments are shell-quoted by the client before being sent to
-the agent, so argument boundaries are preserved. For commands that intentionally
-use shell syntax such as pipes or redirections, pass the complete command as one
-quoted argument.
-
-Start and manage a long-running service:
-
-```bash
-python3 client.py start --cwd /home/user/workspace -- \
-  'CUDA_VISIBLE_DEVICES=0 python flask-diffsynth.py --model /models/FLUX.2'
-
-python3 client.py status JOB_ID
-python3 client.py logs --follow JOB_ID
-python3 client.py stop JOB_ID
-```
-
-The agent writes job logs and an audit trail under
-`~/.local/state/dev-agent/`. Background jobs live only in the agent process's
-in-memory registry, so keep the agent running while managing them.
-
-## 3. Unified MCP server
-
-`mcp_server.py` presents SSH and HTTP-agent machines through one local MCP
-server. Each machine is declared in a TOML registry. The `ssh` backend uses
-an alias from `~/.ssh/config`, including its hostname, user, port, key,
-known-hosts policy, and proxy settings. The registry name is the SSH alias by
-default; set `ssh_alias` only when they differ:
-
-```toml
-[hosts.dev_ssh]
-backend = "ssh"
-ssh_alias = "dev-box"
-root = "/"
-```
-
-The corresponding `Host dev-box` entry belongs in `~/.ssh/config`.
-
-To register a machine running `agent.py`, add an `agent` entry. Its `root`
-must be one of the roots allowed by the agent (or a directory below one):
-
-```toml
-[network_profiles.merlin]
-HTTPS_PROXY = "http://proxy.example:8118"
-
-[hosts.dev_agent]
-backend = "agent"
-url = "http://[2408:xxxx:xxxx::1234]:18765"
-root = "/home/user/workspace"
-network_profile = "merlin"
-```
-
-Define shared command environment variables in `[network_profiles.<name>]`.
-Hosts select a profile with `network_profile`; optional per-host `network_env`
-entries override individual values from that profile. The profile is injected
-only when a command or job uses `network=true`.
-
-For HTTPS with a development certificate, `insecure = true` disables
-certificate verification. Do not use it for a trusted production endpoint.
-Agent connections are direct by default; set `proxy = "host:port"` when an
-HTTP proxy is required.
-The agent backend supports the same health, command, job, log, stop, upload,
-and download MCP tools as the SSH backends. Agent jobs remain addressable only
-while the same `agent.py` process is running.
-
-MCP file transfers are asynchronous. `download_file` and `upload_file` return a
-`transfer_ref` immediately; poll it with `transfer_status`, or request
-cancellation with `stop_transfer`. Use `resume_transfer` after cancellation,
-failure, or an MCP process restart; it creates a new transfer reference and
-continues from the preserved partial file. Transfers have no overall timeout,
-but each chunk request has a bounded timeout so a stalled connection can be
-stopped or retried. Transfers use 8 MiB chunks instead of loading the whole file into MCP memory. Data is written
-to `<destination>.partial`. A later call with the same source and destination
-verifies that partial file against the source prefix and resumes at its current
-size. Once complete, remote/local size and SHA-256 are verified before an
-atomic rename to the requested destination. Existing destinations are not
-overwritten unless `overwrite=true` is passed explicitly. An optional
-`expected_sha256` rejects the transfer before finalization when the selected
-source artifact is not the expected one.
-Only one active transfer may write a given destination in an MCP process. The
-agent also serializes writes to each partial path. The agent has no upload-size
-limit by default; set `--max-upload-gib` to a positive value to configure one.
-The standalone `client.py upload` and `client.py download` commands use the
-same chunk and partial-file protocol.
-
-```bash
-python3 -m pip install -r requirements-mcp.txt
-python3 mcp_server.py --check-host xzb
+[Install]
+WantedBy=multi-user.target
 ```
 
 Register it with Codex:
 
 ```toml
 [mcp_servers.remote_fleet]
-command = "/usr/bin/python3"
-args = [
-  "/absolute/path/to/mcp_server.py",
-  "--config",
-  "/absolute/path/to/hosts.toml",
-]
-cwd = "/absolute/path/to/remote-agent"
+url = "http://127.0.0.1:18766/mcp"
 startup_timeout_sec = 10
 tool_timeout_sec = 300
-enabled = true
-required = false
 ```
 
-The MCP tools cover discovery, health checks, short commands, persistent jobs,
-incremental logs, stopping jobs, and resumable asynchronous file transfer. Set `network=true`
-for a command or job when the host's configured proxy environment is needed.
-The host's `root` is both the default command working directory and the file
-transfer boundary. File transfers have no configured size or suffix limit.
-Changes to `hosts.toml` are detected before the next tool call. The server
-reloads the registry and clears cached SSH sessions automatically, so host
-changes do not require an MCP restart.
+or Claude Code: `claude mcp add --transport http remote_fleet http://127.0.0.1:18766/mcp`.
 
-## Security boundaries
+## 2. Reverse agent (`reverse_agent.py`)
 
-- Run the agent as an unprivileged user; never run it with `sudo`.
-- Restrict `--root` to the smallest useful directories.
-- Restrict inbound access with the host firewall.
-- The agent intentionally supports arbitrary shell commands for automation.
-  Anyone who can connect to its port has the same effective permissions as the
-  agent user.
+On the target machine:
+
+```bash
+python3 reverse_agent.py my-box        # --env merlin is the default
+```
+
+- The name (`[A-Za-z0-9][A-Za-z0-9_.-]*`, up to 64 chars) is the `host` used in
+  MCP tools. The rendezvous defaults to `http://74.211.111.53:18765`;
+  override it with `--server` or `REMOTE_FLEET_SERVER`.
+- `--root` is repeatable and defaults to `/`. Command working directories and
+  file transfers are confined to the roots; the first root is the host's
+  default directory.
+- `--env` is one of `merlin` (default), `volcano` or `null` (no env), naming an
+  `[envs.<name>]` table in the VPS's
+  `hosts.toml`; it is injected when a tool is called with `network=true`.
+- The agent honours `HTTP(S)_PROXY`/`NO_PROXY` when dialing the VPS.
+
+The agent long-polls `POST /v1/agents/poll`; each request it receives runs in
+its own thread and its response is returned with `POST /v1/agents/result`, so
+any number of commands, jobs and transfers can run concurrently. When the
+connection drops it reconnects with exponential backoff (max 30 s).
+
+Liveness and naming:
+
+- A device is offline once it has no poll in flight for 15 s. Its queued and
+  in-flight requests then fail immediately instead of waiting for timeouts.
+- A second agent cannot take a name while the first is online (it keeps
+  retrying and logs who holds the name). Names that collide with an ssh host
+  or direct agent in `hosts.toml` are rejected the same way.
+- Offline devices stay in `list_hosts` (as `backend: reverse`) for 24 hours.
+- If the MCP server restarts, agents re-register automatically. Background
+  jobs live in the agent process, so `job_ref`s survive an MCP restart but not
+  an agent restart. Jobs themselves run in their own session and outlive the
+  agent.
+
+There is no authentication: anyone who can reach the rendezvous port can
+register a name and receive the requests sent to it. They cannot send
+commands, because the MCP endpoint only listens on localhost.
+
+Job logs and an audit trail are written under `~/.local/state/dev-agent/`.
+
+## 3. Direct agent (`direct_agent.py`)
+
+On the target machine:
+
+```bash
+python3 direct_agent.py                 # listens on [::]:18765, roots default to /
+```
+
+Options: `--host`, `--port`, repeatable `--root`, `--max-upload-gib`,
+`--tls-cert/--tls-key`. There is no authentication; restrict the port with a
+firewall. Then register it on the work machine:
+
+```toml
+[hosts.dev_agent]
+backend = "agent"
+url = "http://[2408:xxxx:xxxx::1234]:18765"
+root = "/"           # must be one of the agent's roots or below one
+env = "merlin"
+# proxy = "host:port"   # HTTP proxy to reach the agent; direct by default
+# insecure = true       # skip TLS verification for a self-signed cert
+```
+
+`client.py` talks to a direct agent without MCP:
+
+```bash
+export DEV_AGENT_URL='http://[2408:xxxx:xxxx::1234]:18765'
+python3 client.py health
+python3 client.py exec -- nvidia-smi
+python3 client.py start -- 'python serve.py'; python3 client.py logs --follow JOB_ID
+python3 client.py upload ./a.py /root/a.py; python3 client.py download /root/out.json ./out.json
+```
+
+## 4. ssh hosts and envs
+
+```toml
+[envs.merlin]
+HTTPS_PROXY = "http://proxy.example:8118"
+
+[hosts.dev_ssh]
+backend = "ssh"
+ssh_alias = "dev-box"      # defaults to the table name
+root = "/"
+env = "merlin"             # optional; env_overrides replaces single keys
+```
+
+`env` (ssh/agent hosts) and `--env` (reverse agents) select an `[envs.<name>]`
+table that is injected when a tool runs with `network=true`. Changes to
+`hosts.toml` are picked up before the next tool call.
+
+Both agents print each exec, job and file transfer to the console and keep an
+audit trail and job logs under `~/.local/state/dev-agent/`.
+
+## Tools
+
+`list_hosts`, `health`, `inspect_host`, `exec`, `start_job`, `job_status`,
+`job_logs`, `stop_job`, `download_file`, `upload_file`, `transfer_status`,
+`stop_transfer`, `resume_transfer`.
+
+File transfers are asynchronous and resumable. `download_file`/`upload_file`
+return a `transfer_ref`; poll it with `transfer_status`, cancel with
+`stop_transfer`, and continue after cancellation, failure or an MCP restart
+with `resume_transfer`. Data moves in 8 MiB chunks into
+`<destination>.partial`, which is verified against the source prefix before
+resuming. On completion size and SHA-256 are checked before an atomic rename.
+Existing destinations are only replaced with `overwrite=true`; an optional
+`expected_sha256` guards against the wrong source.

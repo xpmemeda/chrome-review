@@ -5,8 +5,11 @@ from __future__ import annotations
 
 import argparse
 import base64
+import functools
 import hashlib
 import hmac
+import http.client
+import io
 import json
 import os
 import re
@@ -24,7 +27,10 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+import anyio
 from mcp.server.fastmcp import FastMCP
+
+from rendezvous import Rendezvous
 
 
 DEFAULT_CONFIG = Path(
@@ -34,6 +40,8 @@ JOB_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 TRANSFER_CHUNK_BYTES = 8 * 1024 * 1024
 TRANSFER_REQUEST_TIMEOUT = 120
 TRANSFER_METADATA_TIMEOUT = 3600
+# Tools block on remote I/O; each runs in a worker thread, up to this many at once.
+TOOL_THREADS = 256
 
 
 @dataclass(frozen=True)
@@ -41,43 +49,46 @@ class HostConfig:
     name: str
     backend: str
     ssh_alias: str
-    proxy: str | None
     root: str
+    env_vars: dict[str, str] = field(default_factory=dict)
     url: str | None = None
+    proxy: str | None = None
     insecure: bool = False
-    network_env: dict[str, str] = field(default_factory=dict)
 
 
-def load_hosts(path: Path) -> dict[str, HostConfig]:
+def load_config(
+    path: Path,
+) -> tuple[dict[str, HostConfig], dict[str, dict[str, str]]]:
+    """Return ssh/direct-agent hosts and named envs declared in hosts.toml."""
     with path.open("rb") as stream:
         raw = tomllib.load(stream)
-    network_profiles = raw.get("network_profiles", {})
-    if not isinstance(network_profiles, dict):
-        raise ValueError("network_profiles must be a table")
+    raw_envs = raw.get("envs", {})
+    if not isinstance(raw_envs, dict):
+        raise ValueError("envs must be a table")
+    envs: dict[str, dict[str, str]] = {}
+    for env_name, env_vars in raw_envs.items():
+        if not isinstance(env_vars, dict):
+            raise ValueError(f"env {env_name!r} must be a table")
+        envs[env_name] = {str(k): str(v) for k, v in env_vars.items()}
     hosts: dict[str, HostConfig] = {}
     for name, item in raw.get("hosts", {}).items():
-        profile_name = item.get("network_profile")
-        profile_env: dict[str, Any] = {}
-        if profile_name is not None:
-            if not isinstance(profile_name, str) or profile_name not in network_profiles:
-                raise ValueError(
-                    f"host {name!r}: unknown network profile {profile_name!r}"
-                )
-            profile_env = network_profiles[profile_name]
-            if not isinstance(profile_env, dict):
-                raise ValueError(f"network profile {profile_name!r} must be a table")
-        network_env = {**profile_env, **item.get("network_env", {})}
         backend = item.get("backend", "ssh")
         if backend not in {"ssh", "agent"}:
-            raise ValueError(f"host {name!r}: unsupported backend {backend!r}")
-        if backend == "agent" and not item.get("url"):
-            raise ValueError(f"host {name!r}: url is required")
+            raise ValueError(
+                f"host {name!r}: backend must be 'ssh' or 'agent'; "
+                "reverse agents register themselves and are not listed here"
+            )
         if backend == "agent":
-            parsed_url = urllib.parse.urlparse(item["url"])
+            parsed_url = urllib.parse.urlparse(item.get("url", ""))
             if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
-                raise ValueError(
-                    f"host {name!r}: url must be an absolute HTTP(S) URL"
-                )
+                raise ValueError(f"host {name!r}: url must be an absolute HTTP(S) URL")
+        env_name = item.get("env")
+        if env_name is not None and env_name not in envs:
+            raise ValueError(f"host {name!r}: unknown env {env_name!r}")
+        env_vars = {
+            **envs.get(env_name, {}),
+            **{str(k): str(v) for k, v in item.get("env_overrides", {}).items()},
+        }
         root = item.get("root", "/")
         if not root.startswith("/"):
             raise ValueError(f"host {name!r}: root must be absolute")
@@ -85,15 +96,13 @@ def load_hosts(path: Path) -> dict[str, HostConfig]:
             name=name,
             backend=backend,
             ssh_alias=item.get("ssh_alias", name),
-            proxy=item.get("proxy"),
             root=root,
+            env_vars=env_vars,
             url=item.get("url"),
+            proxy=item.get("proxy"),
             insecure=bool(item.get("insecure", False)),
-            network_env={str(k): str(v) for k, v in network_env.items()},
         )
-    if not hosts:
-        raise ValueError(f"no hosts configured in {path}")
-    return hosts
+    return hosts, envs
 
 
 class SSHSession:
@@ -129,24 +138,20 @@ class SSHSession:
         )
 
 
+class TunnelResponse(io.BytesIO):
+    """File-like response for a request relayed through the rendezvous."""
+
+    def __init__(self, status: int, headers: http.client.HTTPMessage, body: bytes):
+        super().__init__(body)
+        self.status = status
+        self.headers = headers
+
+
 class AgentSession:
+    """Agent HTTP API client; subclasses supply the transport."""
+
     def __init__(self, host: HostConfig):
         self.host = host
-        if not host.url:
-            raise ValueError(f"host {host.name!r}: url is required")
-        self.url = host.url.rstrip("/")
-        self.context = ssl._create_unverified_context() if host.insecure else None
-        proxy_url = host.proxy
-        if proxy_url and "://" not in proxy_url:
-            proxy_url = "http://" + proxy_url
-        handlers: list[Any] = [
-            urllib.request.ProxyHandler(
-                {"http": proxy_url, "https": proxy_url} if proxy_url else {}
-            )
-        ]
-        if self.context:
-            handlers.append(urllib.request.HTTPSHandler(context=self.context))
-        self.opener = urllib.request.build_opener(*handlers)
 
     def request(
         self,
@@ -157,13 +162,8 @@ class AgentSession:
         headers: dict[str, str] | None = None,
         timeout: float = 300,
     ):
-        request = urllib.request.Request(
-            self.url + path,
-            data=data,
-            headers=headers or {},
-            method=method,
-        )
-        return self.opener.open(request, timeout=timeout)
+        """Return a file-like response; raise HTTPError for status >= 400."""
+        raise NotImplementedError
 
     def json_request(
         self,
@@ -199,6 +199,7 @@ class AgentSession:
         timeout: float | None = 300,
         env: dict[str, str] | None = None,
     ) -> subprocess.CompletedProcess[bytes]:
+        timeout = 300 if timeout is None else timeout
         payload = {
             "command": command,
             "cwd": cwd,
@@ -207,7 +208,7 @@ class AgentSession:
         }
         try:
             value = self.json_request(
-                "POST", "/v1/exec", payload, timeout=timeout + 5
+                "POST", "/v1/exec", payload, timeout=timeout + 30
             )
         except urllib.error.HTTPError as exc:
             if exc.code == 408:
@@ -258,30 +259,6 @@ class AgentSession:
         return self.json_request(
             "POST", f"/v1/jobs/{job_id}/stop", {}, timeout=30
         )
-
-    def download(
-        self, remote_path: str, *, timeout: float | None = None
-    ) -> tuple[bytes, str | None]:
-        query = urllib.parse.urlencode({"path": remote_path})
-        with self.request("GET", f"/v1/files?{query}", timeout=timeout) as response:
-            return response.read(), response.headers.get("X-Content-SHA256")
-
-    def upload(
-        self, remote_path: str, data: bytes, *, timeout: float | None = None
-    ) -> dict[str, Any]:
-        query = urllib.parse.urlencode({"path": remote_path})
-        digest = hashlib.sha256(data).hexdigest()
-        with self.request(
-            "PUT",
-            f"/v1/files?{query}",
-            data=data,
-            headers={"X-Content-SHA256": digest},
-            timeout=timeout,
-        ) as response:
-            value = json.load(response)
-        if not isinstance(value, dict):
-            raise ValueError(f"agent {self.host.name!r}: response must be a JSON object")
-        return value
 
     def file_info(self, remote_path: str) -> dict[str, Any]:
         query = urllib.parse.urlencode({"path": remote_path})
@@ -335,12 +312,94 @@ class AgentSession:
         )
 
 
+class ReverseAgentSession(AgentSession):
+    """Talks to reverse_agent.py through the rendezvous."""
+
+    def __init__(self, host: HostConfig, rendezvous: Rendezvous):
+        super().__init__(host)
+        self.rendezvous = rendezvous
+
+    def request(
+        self,
+        method: str,
+        path: str,
+        *,
+        data: bytes | None = None,
+        headers: dict[str, str] | None = None,
+        timeout: float = 300,
+    ) -> TunnelResponse:
+        status, raw_headers, body = self.rendezvous.request(
+            self.host.name,
+            method,
+            path,
+            headers=headers,
+            body=data or b"",
+            timeout=timeout,
+        )
+        message = http.client.HTTPMessage()
+        for key, value in raw_headers.items():
+            message[key] = value
+        if status >= 400:
+            raise urllib.error.HTTPError(
+                f"agent://{self.host.name}{path}",
+                status,
+                f"agent {self.host.name!r} returned HTTP {status}",
+                message,
+                io.BytesIO(body),
+            )
+        return TunnelResponse(status, message, body)
+
+
+class DirectAgentSession(AgentSession):
+    """Calls direct_agent.py at the URL configured in hosts.toml."""
+
+    def __init__(self, host: HostConfig):
+        super().__init__(host)
+        if not host.url:
+            raise ValueError(f"host {host.name!r}: url is required")
+        self.url = host.url.rstrip("/")
+        proxy_url = host.proxy
+        if proxy_url and "://" not in proxy_url:
+            proxy_url = "http://" + proxy_url
+        handlers: list[Any] = [
+            urllib.request.ProxyHandler(
+                {"http": proxy_url, "https": proxy_url} if proxy_url else {}
+            )
+        ]
+        if host.insecure:
+            handlers.append(
+                urllib.request.HTTPSHandler(context=ssl._create_unverified_context())
+            )
+        self.opener = urllib.request.build_opener(*handlers)
+
+    def request(
+        self,
+        method: str,
+        path: str,
+        *,
+        data: bytes | None = None,
+        headers: dict[str, str] | None = None,
+        timeout: float = 300,
+    ):
+        request = urllib.request.Request(
+            self.url + path,
+            data=data,
+            headers=headers or {},
+            method=method,
+        )
+        return self.opener.open(request, timeout=timeout)
+
+
 class RemoteFleet:
-    def __init__(self, config_path: Path):
+    """ssh and direct-agent hosts from hosts.toml plus reverse agents
+    registered with the rendezvous."""
+
+    def __init__(self, config_path: Path, rendezvous: Rendezvous):
         self.config_path = config_path
+        self.rendezvous = rendezvous
         self._config_lock = threading.RLock()
-        self.hosts = load_hosts(config_path)
-        self.sessions: dict[str, SSHSession | AgentSession] = {}
+        self.hosts, self.envs = load_config(config_path)
+        self.sessions: dict[str, SSHSession | DirectAgentSession] = {}
         self._config_signature = self._read_config_signature()
 
     def _read_config_signature(self) -> tuple[int, int, int, int]:
@@ -355,37 +414,59 @@ class RemoteFleet:
             signature = self._read_config_signature()
             if signature == self._config_signature:
                 return False
-            hosts = load_hosts(self.config_path)
-            self.hosts = hosts
+            self.hosts, self.envs = load_config(self.config_path)
             self.sessions.clear()
             self._config_signature = signature
             return True
 
+    def check_agent_name(self, name: str) -> str | None:
+        """Rendezvous hook: reject agent names that shadow a hosts.toml host."""
+        self.reload_if_changed()
+        with self._config_lock:
+            if name in self.hosts:
+                return f"name {name!r} is already a host in hosts.toml"
+        return None
+
+    def _agent_host(self, device: dict[str, Any]) -> HostConfig:
+        env_name = device.get("env")
+        with self._config_lock:
+            env_vars = dict(self.envs.get(env_name, {})) if env_name else {}
+        roots = device.get("roots") or ["/"]
+        return HostConfig(
+            name=device["name"],
+            backend="reverse",
+            ssh_alias="",
+            root=roots[0],
+            env_vars=env_vars,
+        )
+
     def configured_hosts(self) -> tuple[HostConfig, ...]:
         self.reload_if_changed()
         with self._config_lock:
-            return tuple(self.hosts.values())
+            hosts = list(self.hosts.values())
+        hosts += [self._agent_host(item) for item in self.rendezvous.list_devices()]
+        return tuple(hosts)
 
     def host(self, name: str) -> HostConfig:
         self.reload_if_changed()
         with self._config_lock:
-            if name not in self.hosts:
-                raise ValueError(
-                    f"unknown host {name!r}; configured: {', '.join(self.hosts)}"
-                )
-            return self.hosts[name]
+            if name in self.hosts:
+                return self.hosts[name]
+            known = list(self.hosts)
+        device = self.rendezvous.device(name)
+        if device is not None:
+            return self._agent_host(device)
+        known += [item["name"] for item in self.rendezvous.list_devices()]
+        raise ValueError(f"unknown host {name!r}; known: {', '.join(known)}")
 
     def session(self, name: str) -> SSHSession | AgentSession:
-        self.reload_if_changed()
+        host = self.host(name)
+        if host.backend == "reverse":
+            return ReverseAgentSession(host, self.rendezvous)
         with self._config_lock:
-            if name not in self.hosts:
-                raise ValueError(
-                    f"unknown host {name!r}; configured: {', '.join(self.hosts)}"
-                )
-            host = self.hosts[name]
             if name not in self.sessions:
                 if host.backend == "agent":
-                    self.sessions[name] = AgentSession(host)
+                    self.sessions[name] = DirectAgentSession(host)
                 else:
                     self.sessions[name] = SSHSession(host)
             return self.sessions[name]
@@ -402,7 +483,7 @@ class RemoteFleet:
         if network:
             prefix = "".join(
                 f"export {key}={shlex.quote(value)}; "
-                for key, value in host.network_env.items()
+                for key, value in host.env_vars.items()
             )
         script = f"cd -- {shlex.quote(workdir)} && {prefix}{command}"
         return "bash -lc " + shlex.quote(script)
@@ -424,7 +505,7 @@ class RemoteFleet:
                 command,
                 cwd=cwd or session.host.root,
                 timeout=timeout,
-                env=session.host.network_env if network else None,
+                env=session.host.env_vars if network else None,
             )
         return session.run(
             self.shell_command(session.host, command, cwd, network),
@@ -995,7 +1076,9 @@ def create_server(
     host: str = "127.0.0.1",
     port: int = 18766,
 ) -> tuple[FastMCP, RemoteFleet]:
-    fleet = RemoteFleet(config_path)
+    rendezvous = Rendezvous()
+    fleet = RemoteFleet(config_path, rendezvous)
+    rendezvous.name_check = fleet.check_agent_name
     transfers = TransferManager(fleet)
     server = FastMCP(
         "remote_fleet",
@@ -1003,29 +1086,68 @@ def create_server(
         port=port,
         stateless_http=True,
         instructions=(
-            "统一管理配置中的远程机器。先用 list_hosts/health 确认目标；短命令用 exec，"
+            "统一管理远程机器：ssh 和 agent（直连 direct_agent.py）主机来自 hosts.toml，"
+            "reverse 主机由目标机器运行 reverse_agent.py 自动注册。先用 list_hosts/health 确认目标；短命令用 exec，"
             "长任务用 start_job 并保留完整 job_ref。文件传输是异步、可续传任务，"
             "使用 download_file/upload_file 启动后，以 transfer_status 查询。"
             "失败、中止或 MCP 重启后使用 resume_transfer 续传。"
-            "文件传输限制在主机配置的 root 下。"
+            "文件传输限制在主机的 root 下。"
             "hosts.toml 变更会在下一次工具调用时自动加载。"
-            "network=true 会注入该机器配置的网络代理环境。"
+            "network=true 会注入该机器的网络代理环境。"
         ),
     )
+    limiter: anyio.CapacityLimiter | None = None
 
-    @server.tool()
+    def tool(name: str | None = None):
+        """Register a blocking tool so it runs off the event loop.
+
+        FastMCP calls sync tools inline, which would serialise every call.
+        """
+
+        def register(fn):
+            @functools.wraps(fn)
+            async def run_in_thread(*args, **kwargs):
+                nonlocal limiter
+                if limiter is None:
+                    limiter = anyio.CapacityLimiter(TOOL_THREADS)
+                return await anyio.to_thread.run_sync(
+                    functools.partial(fn, *args, **kwargs), limiter=limiter
+                )
+
+            server.tool(name=name)(run_in_thread)
+            return fn
+
+        return register
+
+    @tool()
     def list_hosts() -> list[dict[str, Any]]:
-        """列出配置的远程机器、后端和根目录，不建立连接。"""
-        return [
-            {
-                "host": host.name,
-                "backend": host.backend,
-                "root": host.root,
+        """列出 ssh、agent（直连）主机和已注册的 reverse 主机；reverse 带在线状态，不建立连接。"""
+        devices = {item["name"]: item for item in fleet.rendezvous.list_devices()}
+        result = []
+        for cfg in fleet.configured_hosts():
+            entry: dict[str, Any] = {
+                "host": cfg.name,
+                "backend": cfg.backend,
+                "root": cfg.root,
             }
-            for host in fleet.configured_hosts()
-        ]
+            device = devices.get(cfg.name)
+            if cfg.backend == "reverse" and device is not None:
+                entry.update(
+                    online=device["online"],
+                    hostname=device["hostname"],
+                    pid=device["pid"],
+                    env=device["env"],
+                    last_seen=time.strftime(
+                        "%Y-%m-%d %H:%M:%S", time.localtime(device["last_seen"])
+                    ),
+                )
+                env_name = device["env"]
+                if env_name and env_name not in fleet.envs:
+                    entry["warning"] = f"unknown env {env_name!r}"
+            result.append(entry)
+        return result
 
-    @server.tool()
+    @tool()
     def health(host: str) -> dict[str, Any]:
         """验证远程机器是否可登录，并返回主机名。"""
         session = fleet.session(host)
@@ -1050,7 +1172,7 @@ def create_server(
         proc = fleet.run(host, "hostname", cwd="/", timeout=30)
         return {"host": host, "reachable": proc.returncode == 0, **result_of(proc)}
 
-    @server.tool()
+    @tool()
     def inspect_host(host: str) -> dict[str, Any]:
         """只读检查主机、GPU、根目录和启动脚本是否存在。"""
         cfg = fleet.host(host)
@@ -1066,7 +1188,7 @@ def create_server(
         proc = fleet.run(host, script, timeout=45)
         return {"host": host, **result_of(proc)}
 
-    @server.tool(name="exec")
+    @tool(name="exec")
     def exec_command(
         host: str,
         command: str,
@@ -1088,7 +1210,7 @@ def create_server(
                 "stderr": decoded(exc.stderr or b""),
             }
 
-    @server.tool()
+    @tool()
     def start_job(
         host: str,
         command: str,
@@ -1103,7 +1225,7 @@ def create_server(
             value = session.start_job(
                 command,
                 cwd=workdir,
-                env=cfg.network_env if network else None,
+                env=cfg.env_vars if network else None,
             )
             job_id = str(value["id"])
             if not JOB_ID_RE.fullmatch(job_id):
@@ -1120,7 +1242,7 @@ def create_server(
         if network:
             exports = "".join(
                 f"export {key}={shlex.quote(value)}; "
-                for key, value in cfg.network_env.items()
+                for key, value in cfg.env_vars.items()
             )
         inner = (
             f"cd -- {shlex.quote(workdir)} && {exports}"
@@ -1144,7 +1266,7 @@ def create_server(
             "stderr": decoded(proc.stderr),
         }
 
-    @server.tool()
+    @tool()
     def job_status(job_ref: str) -> dict[str, Any]:
         """查询 start_job 返回的任务状态和退出码。"""
         host, job_id = parse_job_ref(fleet, job_ref)
@@ -1174,7 +1296,7 @@ def create_server(
             "stderr": decoded(proc.stderr),
         }
 
-    @server.tool()
+    @tool()
     def job_logs(job_ref: str, offset: int = 0, limit: int = 262144) -> dict[str, Any]:
         """按字节偏移读取任务日志，并返回下一次应使用的 offset。"""
         host, job_id = parse_job_ref(fleet, job_ref)
@@ -1212,7 +1334,7 @@ def create_server(
             "stderr": decoded(proc.stderr),
         }
 
-    @server.tool()
+    @tool()
     def stop_job(job_ref: str) -> dict[str, Any]:
         """终止远端任务的整个进程组。"""
         host, job_id = parse_job_ref(fleet, job_ref)
@@ -1235,7 +1357,7 @@ def create_server(
         proc = session.run("bash -lc " + shlex.quote(script), timeout=30)
         return {"job_ref": job_ref, "stopped": proc.returncode == 0, **result_of(proc)}
 
-    @server.tool()
+    @tool()
     def download_file(
         host: str,
         remote_path: str,
@@ -1252,7 +1374,7 @@ def create_server(
             overwrite,
         )
 
-    @server.tool()
+    @tool()
     def upload_file(
         host: str,
         local_path: str,
@@ -1269,17 +1391,17 @@ def create_server(
             overwrite,
         )
 
-    @server.tool()
+    @tool()
     def transfer_status(transfer_ref: str) -> dict[str, Any]:
         """查询异步上传或下载的进度、校验结果与最终状态。"""
         return transfers.status(transfer_ref)
 
-    @server.tool()
+    @tool()
     def stop_transfer(transfer_ref: str) -> dict[str, Any]:
         """请求停止传输；已写入的 .partial 文件会保留供下次续传。"""
         return transfers.stop(transfer_ref)
 
-    @server.tool()
+    @tool()
     def resume_transfer(transfer_ref: str) -> dict[str, Any]:
         """从原任务保留的 .partial 文件创建续传任务，并返回新的 transfer_ref。"""
         return transfers.resume(transfer_ref)
@@ -1290,9 +1412,20 @@ def create_server(
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=18766)
-    parser.add_argument("--check-host")
+    parser.add_argument("--host", default="127.0.0.1", help="MCP listen address")
+    parser.add_argument("--port", type=int, default=18766, help="MCP listen port")
+    parser.add_argument(
+        "--rendezvous-host",
+        default="::",
+        help="agent rendezvous listen address; :: also accepts IPv4",
+    )
+    parser.add_argument(
+        "--rendezvous-port",
+        type=int,
+        default=18765,
+        help="port for reverse_agent.py registrations; 0 disables reverse agents",
+    )
+    parser.add_argument("--check-host", help="run hostname on a hosts.toml host and exit")
     args = parser.parse_args()
     server, fleet = create_server(
         args.config.expanduser(),
@@ -1308,6 +1441,8 @@ def main() -> None:
         )
         print(json.dumps(result_of(proc), ensure_ascii=False, indent=2))
         raise SystemExit(proc.returncode)
+    if args.rendezvous_port:
+        fleet.rendezvous.serve(args.rendezvous_host, args.rendezvous_port)
     server.run(transport="streamable-http")
 
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI client for agent.py."""
+"""CLI client for direct_agent.py."""
 
 from __future__ import annotations
 
