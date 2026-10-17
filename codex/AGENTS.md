@@ -26,7 +26,10 @@ Claude 会运行在一个独立的 Agent 工作机器上，因此操作用户个
 
 代码仓库放在用户个人开发机的 `~/workspace/github` 或者 `~/workspace/byted` 目录下。
 当用户提到要保存代码时，需要把试验机器上的改动落到用户个人开发机。
-提交 commit 时，信息里面带上 "Co-authored-by: Codex <noreply@openai.com>"，不要 push。
+提交 commit 时，按自己的身份在信息里带上对应署名，不要 push：
+
+- Codex：`Co-authored-by: Codex <noreply@openai.com>`
+- Claude：`Co-Authored-By: Claude <noreply@anthropic.com>`（可带上具体模型名）
 
 写代码的时候不用急着写测试和运行测试，先把功能实现，注意模块化的功能划分。
 
