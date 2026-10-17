@@ -65,7 +65,7 @@ or Claude Code: `claude mcp add --transport http remote_fleet http://127.0.0.1:1
 On the target machine:
 
 ```bash
-python3 reverse_agent.py my-box        # --env merlin is the default
+python3 reverse_agent.py my-box --env merlin
 ```
 
 - The name (`[A-Za-z0-9][A-Za-z0-9_.-]*`, up to 64 chars) is the `host` used in
@@ -74,10 +74,13 @@ python3 reverse_agent.py my-box        # --env merlin is the default
 - `--root` is repeatable and defaults to `/`. Command working directories and
   file transfers are confined to the roots; the first root is the host's
   default directory.
-- `--env` is one of `merlin` (default), `volcano` or `null` (no env), naming an
+- `--env` is required: `merlin`, `volcano` or `null` (no env), naming an
   `[envs.<name>]` table in the VPS's
   `hosts.toml`; it is injected when a tool is called with `network=true`.
-- The agent honours `HTTP(S)_PROXY`/`NO_PROXY` when dialing the VPS.
+- `--env` also picks the proxy used to dial the VPS: merlin uses
+  `sys-proxy-rd-relay.byted.org:8118`, volcano `100.66.18.103:3128`, and
+  null follows `HTTP(S)_PROXY` from the environment (direct if unset). The
+  proxy is not exported to commands the agent runs.
 
 The agent long-polls `POST /v1/agents/poll`; each request it receives runs in
 its own thread and its response is returned with `POST /v1/agents/result`, so

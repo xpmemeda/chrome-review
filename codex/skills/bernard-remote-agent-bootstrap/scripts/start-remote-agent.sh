@@ -51,7 +51,7 @@ if [[ ${2:-} == --worker ]]; then
     "$PYTHON" -m py_compile "$stage"
     mv -f "$stage" "$AGENT_PATH"
     args=("$DEVICE_NAME" --server "$REMOTE_FLEET_SERVER" --root /)
-    [[ -n $AGENT_ENV ]] && args+=(--env "$AGENT_ENV")  # 未设置时 agent 默认 merlin
+    args+=(--env "${AGENT_ENV:-null}")
     exec "$PYTHON" "$AGENT_PATH" "${args[@]}"
 fi
 

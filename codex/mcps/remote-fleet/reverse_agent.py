@@ -37,6 +37,11 @@ RESULT_RETRIES = 5
 DEFAULT_SERVER = "http://74.211.111.53:18765"
 # Names of [envs.<name>] tables in the MCP server's hosts.toml; "null" = none.
 ENV_CHOICES = ("merlin", "volcano", "null")
+# HTTP proxy used to reach the rendezvous from each env's network.
+ENV_PROXIES = {
+    "merlin": "http://sys-proxy-rd-relay.byted.org:8118",
+    "volcano": "http://100.66.18.103:3128",
+}
 MAX_BACKOFF = 30
 
 
@@ -431,6 +436,7 @@ class Connector:
         name: str,
         dispatcher: Dispatcher,
         env: str | None,
+        proxy: str | None,
     ):
         self.server = server.rstrip("/")
         self.name = name
@@ -445,8 +451,14 @@ class Connector:
             "env": env,
             "wait": POLL_WAIT,
         }
-        # urllib honours HTTP(S)_PROXY / NO_PROXY from the environment.
-        self.opener = urllib.request.build_opener()
+        # Only the rendezvous connection uses this proxy; commands keep their
+        # own environment. Without one, urllib follows HTTP(S)_PROXY/NO_PROXY.
+        if proxy is None:
+            self.opener = urllib.request.build_opener()
+        else:
+            self.opener = urllib.request.build_opener(
+                urllib.request.ProxyHandler({"http": proxy, "https": proxy})
+            )
 
     def _post(self, path: str, payload: dict, timeout: float) -> dict:
         request = urllib.request.Request(
@@ -563,8 +575,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--env",
         choices=ENV_CHOICES,
-        default="merlin",
-        help="env injected for network=true commands (default: merlin)",
+        required=True,
+        help="network env: picks the proxy for reaching the server (null: "
+        "HTTP(S)_PROXY from the environment, else direct) and the env "
+        "injected for network=true commands",
     )
     parser.add_argument("--root", action="append", default=[], help="allowed filesystem root; repeatable; default /")
     parser.add_argument("--state-dir", default="~/.local/state/dev-agent")
@@ -585,8 +599,11 @@ def main() -> None:
     roots = [Path(value) for value in args.root] or [Path("/")]
     max_upload = int(args.max_upload_gib * 1024**3) if args.max_upload_gib else None
     state = AgentState(roots, Path(args.state_dir), max_upload)
-    connector = Connector(args.server, args.name, Dispatcher(state), None if args.env == "null" else args.env)
-    log(f"agent {args.name!r} (pid {os.getpid()}) dialing {connector.server}")
+    proxy = ENV_PROXIES.get(args.env)
+    env = None if args.env == "null" else args.env
+    connector = Connector(args.server, args.name, Dispatcher(state), env, proxy)
+    route = f"via {proxy}" if proxy else "proxy from environment, if any"
+    log(f"agent {args.name!r} (pid {os.getpid()}) dialing {connector.server} ({route})")
     log("allowed roots: " + ", ".join(str(root) for root in state.roots))
     try:
         connector.run_forever()

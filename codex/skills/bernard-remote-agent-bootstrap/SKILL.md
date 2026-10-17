@@ -29,10 +29,10 @@ HTTPS_PROXY=http://sys-proxy-rd-relay.byted.org:8118 curl -fsSL \
   -o /tmp/reverse_agent.py &&
 python3 -m py_compile /tmp/reverse_agent.py &&
 tmux new-session -d -s remote-agent \
-  'HTTPS_PROXY=http://sys-proxy-rd-relay.byted.org:8118 python3 /tmp/reverse_agent.py <设备名> --root /'
+  'python3 /tmp/reverse_agent.py <设备名> --env merlin --root /'
 ```
 
-- 连接 VPS 走 `HTTP(S)_PROXY`；Merlin 机器访问公网需要上面的代理。火山机器（hostname 以 `di-` 开头）用 `http://100.66.18.103:3128` 和 `--env volcano`。`--env` 只能是 `merlin`（默认）、`volcano` 或 `null`。
+- 下载 `reverse_agent.py` 需要上面的代理；agent 连 VPS 的代理由 `--env` 内置决定，无需另设环境变量。火山机器（hostname 以 `di-` 开头）下载时用 `http://100.66.18.103:3128`，启动加 `--env volcano`。`--env` 必填，只能是 `merlin`、`volcano` 或 `null`（沿用环境变量中的代理，未设置则直连）。
 - 若无 tmux，先在目标 Pod 安装（Debian/Ubuntu：`apt-get update -qq && apt-get install -y tmux`）；安装失败时停止并报告。
 - 若 `remote-agent` tmux 会话已存在，先读会话输出（`tmux capture-pane -pt remote-agent -S -30`），不要重复启动。
 - 输出 `connected to ... as '<设备名>'` 表示注册成功；`registration rejected` 表示设备名被其他在线 agent 或 ssh 主机占用，换名重启。
