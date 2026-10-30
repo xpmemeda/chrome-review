@@ -72,6 +72,11 @@ case "$event" in
     run_ai_report
     run_log SubagentStop
     ;;
+  permissionRequest)
+    # Leave the permission decision to Codex's normal approval flow.
+    # Flux Island notification is handled by a separate configured hook.
+    :
+    ;;
   *)
     echo "run-hook.sh: unknown hook event: $event" >&2
     exit 2
