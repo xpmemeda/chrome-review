@@ -62,6 +62,29 @@ or Claude Code: `claude mcp add --transport http remote_fleet http://127.0.0.1:1
 
 ## 2. Reverse agent (`reverse_agent.py`)
 
+### Windows 原生运行
+
+安装 Python 3.10 或更新版本，在 PowerShell 中运行本地脚本：
+
+```powershell
+py -3 reverse_agent.py windows-pc --env null --root C:/ --root D:/
+```
+
+只填写实际存在且需要访问的盘符。不传 `--root` 时，Windows 默认使用用户主目录；Linux 仍默认 `/`。
+Windows 优先使用 PowerShell 7 (`pwsh.exe`)，否则使用系统 Windows PowerShell；Linux 保持 `/bin/bash -lc`。
+Windows 请求中的 `command` 应使用 PowerShell 语法，`cwd` 使用 Windows 路径。
+PowerShell 使用无配置、非交互模式，输出设为 UTF-8；旧式程序如果自行输出其他编码，仍可能出现乱码。
+Windows 停止任务和执行超时使用 `taskkill /T /F` 强制结束进程树，不提供 Unix 的 SIGTERM 优雅退出语义。
+如果父进程已退出或子进程已脱离进程树，不能保证清理该子进程。
+`--env null` 沿用代理环境变量，未设置则直连。诊断权限由启动 agent 的 Windows 用户决定。
+`--root` 限制文件接口及命令工作目录，不是 shell 沙箱。关闭终端会影响 agent 的持续运行。
+
+回归验证（Linux 使用 `python3`，Windows 使用 `py -3`）：
+
+```text
+python3 -m unittest test_reverse_agent.py -v
+```
+
 On the target machine:
 
 ```bash

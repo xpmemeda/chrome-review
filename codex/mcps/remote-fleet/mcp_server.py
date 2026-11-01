@@ -24,7 +24,7 @@ import urllib.parse
 import urllib.request
 import uuid
 from dataclasses import dataclass, field
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 import anyio
@@ -513,11 +513,12 @@ class RemoteFleet:
             input_data=input_data,
         )
 
-    def validate_transfer_path(self, host: HostConfig, value: str) -> PurePosixPath:
-        path = PurePosixPath(value)
+    def validate_transfer_path(self, host: HostConfig, value: str) -> PurePosixPath | PureWindowsPath:
+        path_type = PureWindowsPath if PureWindowsPath(host.root).is_absolute() else PurePosixPath
+        path = path_type(value)
         if not path.is_absolute() or ".." in path.parts:
             raise ValueError("remote path must be absolute and cannot contain '..'")
-        root = PurePosixPath(host.root)
+        root = path_type(host.root)
         if path != root and root not in path.parents:
             raise ValueError(f"remote path is outside root: {path}")
         return path

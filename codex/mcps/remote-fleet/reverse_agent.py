@@ -17,6 +17,8 @@ import hmac
 import json
 import os
 import re
+import shutil
+import socket
 import signal
 import subprocess
 import threading
@@ -43,6 +45,52 @@ ENV_PROXIES = {
     "volcano": "http://100.66.18.103:3128",
 }
 MAX_BACKOFF = 30
+
+
+def command_args(command: str) -> list[str]:
+    """Keep the Linux login shell; use an encoded PowerShell script on Windows."""
+    if os.name != "nt":
+        return ["/bin/bash", "-lc", command]
+    shell = shutil.which("pwsh.exe") or shutil.which("powershell.exe")
+    if not shell:
+        raise FileNotFoundError("PowerShell is required (pwsh.exe or powershell.exe)")
+    script = (
+        "$utf8 = New-Object System.Text.UTF8Encoding($false); "
+        "[Console]::InputEncoding = $utf8; [Console]::OutputEncoding = $utf8; "
+        "$OutputEncoding = $utf8; $ErrorActionPreference = 'Stop'; "
+        "$global:LASTEXITCODE = 0; "
+        "& {\n" + command + "\n}; "
+        "if (-not $?) { exit 1 }; exit $LASTEXITCODE"
+    )
+    encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
+    return [shell, "-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded]
+
+
+def spawn_command(command: str, cwd: Path, env: dict[str, str], **kwargs) -> subprocess.Popen:
+    if os.name == "nt":
+        kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+        if kwargs.get("text"):
+            kwargs["encoding"] = "utf-8"
+    else:
+        kwargs["start_new_session"] = True
+    return subprocess.Popen(command_args(command), cwd=cwd, env=env, **kwargs)
+
+
+def stop_process_tree(process: subprocess.Popen, *, force: bool = False) -> None:
+    if os.name == "nt":
+        # Windows has no SIGTERM process-group equivalent. /T includes descendants.
+        result = subprocess.run(
+            [str(Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "taskkill.exe"),
+             "/PID", str(process.pid), "/T", "/F"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15,
+        )
+        if result.returncode and process.poll() is None:
+            raise RuntimeError(f"taskkill failed for PID {process.pid}: {result.returncode}")
+        return
+    try:
+        os.killpg(process.pid, signal.SIGKILL if force else signal.SIGTERM)
+    except ProcessLookupError:
+        pass
 
 
 class AgentState:
@@ -81,7 +129,7 @@ class AgentState:
                 stream.write(line)
 
     def path_lock(self, path: Path) -> threading.Lock:
-        key = str(path)
+        key = os.path.normcase(str(path))
         with self.lock:
             return self.path_locks.setdefault(key, threading.Lock())
 
@@ -147,7 +195,9 @@ class Dispatcher:
             if path == "/v1/health":
                 return json_response(HTTPStatus.OK, {
                     "ok": True,
-                    "hostname": os.uname().nodename,
+                    "hostname": socket.gethostname(),
+                    "platform": os.name,
+                    "shell": "powershell" if os.name == "nt" else "bash",
                     "pid": os.getpid(),
                     "roots": [str(p) for p in self.state.roots],
                 })
@@ -199,16 +249,15 @@ class Dispatcher:
         started = time.monotonic()
         tag = f"exec[{uuid.uuid4().hex[:6]}]"
         log(f"{tag} $ {brief(command)}  (cwd={cwd})")
-        process = subprocess.Popen(
-            ["/bin/bash", "-lc", command], cwd=cwd, env=env,
+        process = spawn_command(
+            command, cwd, env,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="replace",
-            start_new_session=True,
         )
         try:
             stdout, stderr = process.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:
-            os.killpg(process.pid, signal.SIGKILL)
-            stdout, stderr = process.communicate()
+            stop_process_tree(process, force=True)
+            stdout, stderr = process.communicate(timeout=15)
             log(f"{tag} killed after {timeout:g}s timeout")
             self.state.audit("exec_timeout", command=command, cwd=str(cwd), timeout=timeout)
             return json_response(HTTPStatus.REQUEST_TIMEOUT, {
@@ -231,9 +280,9 @@ class Dispatcher:
         log_path = self.state.logs_dir / f"{job_id}.log"
         log_stream = log_path.open("ab", buffering=0)
         try:
-            process = subprocess.Popen(
-                ["/bin/bash", "-lc", command], cwd=cwd, env=env,
-                stdout=log_stream, stderr=subprocess.STDOUT, start_new_session=True,
+            process = spawn_command(
+                command, cwd, env,
+                stdout=log_stream, stderr=subprocess.STDOUT,
             )
         finally:
             log_stream.close()
@@ -291,11 +340,11 @@ class Dispatcher:
         job = self._get_job(job_id)
         process = job["process"]
         if process.poll() is None:
-            os.killpg(process.pid, signal.SIGTERM)
+            stop_process_tree(process)
             try:
                 process.wait(timeout=10)
             except subprocess.TimeoutExpired:
-                os.killpg(process.pid, signal.SIGKILL)
+                stop_process_tree(process, force=True)
                 process.wait(timeout=5)
         log(f"job[{job_id[:8]}] stop requested")
         self.state.audit("job_stop", job_id=job_id, exit_code=process.returncode)
@@ -445,7 +494,7 @@ class Connector:
         self.registration = {
             "name": name,
             "instance": self.instance,
-            "hostname": os.uname().nodename,
+            "hostname": socket.gethostname(),
             "pid": os.getpid(),
             "roots": [str(root) for root in dispatcher.state.roots],
             "env": env,
@@ -580,7 +629,7 @@ def parse_args() -> argparse.Namespace:
         "HTTP(S)_PROXY from the environment, else direct) and the env "
         "injected for network=true commands",
     )
-    parser.add_argument("--root", action="append", default=[], help="allowed filesystem root; repeatable; default /")
+    parser.add_argument("--root", action="append", default=[], help="allowed filesystem root; repeatable; default / on Unix, user home on Windows")
     parser.add_argument("--state-dir", default="~/.local/state/dev-agent")
     parser.add_argument(
         "--max-upload-gib",
@@ -596,7 +645,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    roots = [Path(value) for value in args.root] or [Path("/")]
+    roots = [Path(value) for value in args.root] or [Path.home() if os.name == "nt" else Path("/")]
     max_upload = int(args.max_upload_gib * 1024**3) if args.max_upload_gib else None
     state = AgentState(roots, Path(args.state_dir), max_upload)
     proxy = ENV_PROXIES.get(args.env)

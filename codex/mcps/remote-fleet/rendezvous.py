@@ -21,6 +21,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import PurePosixPath, PureWindowsPath
 from typing import Any, Callable
 
 
@@ -164,7 +165,9 @@ class Rendezvous:
             raise ValueError("instance is required")
         roots = payload.get("roots") or ["/"]
         if not isinstance(roots, list) or not all(
-            isinstance(root, str) and root.startswith("/") for root in roots
+            isinstance(root, str) and (
+                PurePosixPath(root).is_absolute() or PureWindowsPath(root).is_absolute()
+            ) for root in roots
         ):
             raise ValueError("roots must be a list of absolute paths")
         env_name = payload.get("env")
