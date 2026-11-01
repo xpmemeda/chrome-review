@@ -1,3 +1,4 @@
+__pycache__
 build
 build-*
 hello-world
@@ -9,13 +10,12 @@ hello_world*
 *.npz
 *.trt
 
-__pycache__
 
 .*
 !.gitignore
 !.vscode
 !.zshrc
-
+!.opencode
 !.agents
 !.codex
 !.codebuddy
