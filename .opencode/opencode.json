@@ -40,6 +40,28 @@
           }
         }
       }
+    },
+    "CollinMu": {
+      "name": "CollinMu",
+      "package": "@opencode/ai/providers/anthropic-compatible",
+      "settings": {
+        "baseURL": "http://74.211.111.53:8080/v1",
+        "apiKey": "{file:~/.secrets/collinmu.key}"
+      },
+      "models": {
+        "claude-sonnet-5-5": {
+          "name": "Claude Sonnet 5.5",
+          "capabilities": { "tools": true, "input": ["text"], "output": ["text"] }
+        },
+        "claude-opus-5-5": {
+          "name": "Claude Opus 5.5",
+          "capabilities": { "tools": true, "input": ["text"], "output": ["text"] }
+        },
+        "claude-haiku-5-5": {
+          "name": "Claude Haiku 5.5",
+          "capabilities": { "tools": true, "input": ["text"], "output": ["text"] }
+        }
+      }
     }
   }
 }
