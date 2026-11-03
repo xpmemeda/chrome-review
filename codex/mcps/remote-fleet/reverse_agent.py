@@ -586,14 +586,24 @@ class Connector:
                 self._post("/v1/agents/result", payload, timeout=120)
                 return
             except urllib.error.HTTPError as exc:
-                log(f"result for {request.method} {request.path} rejected: HTTP {exc.code}")
-                return
-            except (OSError, ValueError) as exc:
-                if attempt == RESULT_RETRIES - 1:
-                    log(f"dropping result for {request.method} {request.path}: {exc}")
+                # Proxies in front of the rendezvous can fail transiently
+                # (e.g. HTTP 530); the server accepts duplicate results.
+                if not is_retryable_status(exc.code):
+                    log(f"result for {request.method} {request.path} rejected: HTTP {exc.code}")
                     return
-                time.sleep(delay)
-                delay = min(delay * 2, MAX_BACKOFF)
+                reason = f"HTTP {exc.code}: {error_message(exc)}"
+            except (OSError, ValueError) as exc:
+                reason = str(exc)
+            if attempt == RESULT_RETRIES - 1:
+                log(f"dropping result for {request.method} {request.path}: {reason}")
+                return
+            log(f"result for {request.method} {request.path} failed: {reason}; retrying in {delay}s")
+            time.sleep(delay)
+            delay = min(delay * 2, MAX_BACKOFF)
+
+
+def is_retryable_status(code: int) -> bool:
+    return code >= 500 or code in (HTTPStatus.REQUEST_TIMEOUT, HTTPStatus.TOO_MANY_REQUESTS)
 
 
 def error_message(exc: urllib.error.HTTPError) -> str:
