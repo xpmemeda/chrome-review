@@ -44,40 +44,40 @@ backend = "ssh"
 env = "volcano"
 root = "/"
 
-[hosts.xp]
+[hosts.llmserver-ff45d]
 backend = "agent"
 env = "merlin"
-url = "http://[2605:340:cd51:4900:e3cd:a480:5dc4:e21e]:18765"
+url = "http://[2605:340:cd60:0:b59c:916a:2b4c:1b42]:18765"
 root = "/"
 
-[hosts.zy]
+[hosts.llmserver-mi308x]
 backend = "agent"
 env = "merlin"
-url = "http://[2605:340:cd51:4900:79d7:7ca2:f91b:ee04]:18765"
+url = "http://[2605:340:cd60:0:fdf:b0bb:4217:ec56]:18765"
 root = "/"
 
 [hosts.xsc]
 backend = "agent"
 env = "merlin"
-url = "http://[2605:340:cd60:0:40e6:1798:49b0:88c8]:18765"
+url = "http://[2605:340:cd51:4900:98dc:c92d:807d:ea25]:18765"
 root = "/"
 
 [hosts.xmy]
 backend = "agent"
 env = "merlin"
-url = "http://[2605:340:cd60:0:7cf6:1b2:8c0:b2ce]:18765"
+url = "http://[2605:340:cd51:4900:15e:6a88:241e:e3aa]:18765"
 root = "/"
 
 [hosts.xxx]
 backend = "agent"
 env = "merlin"
-url = "http://[2605:340:cd60:0:2865:dbfb:1b0d:e467]:18765"
+url = "http://[2605:340:cd60:0:5151:1b85:6d1f:677e]:18765"
 root = "/"
 
 [hosts.xzz]
 backend = "agent"
 env = "merlin"
-url = "http://[2605:340:cd60::e15e:6d24:5dcc]:18765"
+url = "http://[2605:340:cd51:4900:4a49:5f60:8e75:1ba5]:18765"
 root = "/"
 
 [hosts.xpbench]
@@ -113,17 +113,41 @@ root = "/"
 [hosts.xpdev-910b2]
 backend = "agent"
 env = "merlin"
-url = "http://[2605:340:cd51:4900:5582:845b:b7f1:16a]:18765"
+url = "http://[2605:340:cd51:4900:c427:9b2c:5eda:bda6]:18765"
 root = "/"
 
-[hosts.xpdev-2nd]
+[hosts.xpdev-ff40]
 backend = "agent"
 env = "merlin"
-url = "http://[2605:340:cd51:8700:0:2417:81be:f95b]:18765"
+url = "http://[2605:340:cd51:7702:55c:7060:eeba:f452]:18765"
 root = "/"
 
-[hosts.cot-h20]
+[hosts.xpdev-h20]
 backend = "agent"
 env = "merlin"
-url = "http://[2605:340:cd51:5800:d4bf:17ca:b79b:a772]:18765"
+url = "http://[2605:340:cd51:4900:8a1:40c7:e689:ae66]:18765"
+root = "/"
+
+[hosts.cot]
+backend = "agent"
+env = "merlin"
+url = "http://[2605:340:cd51:4b00:0:8abb:8cda:6809]:18765"
+root = "/"
+
+[hosts.llmhub]
+backend = "agent"
+env = "merlin"
+url = "http://[2605:340:cd51:7702:d900:b356:1eba:9a50]:18765"
+root = "/"
+
+[hosts.llmserver-910b]
+backend = "agent"
+env = "merlin"
+url = "http://[2605:340:cd51:7702:565:cb9e:8f78:52d7]:18765"
+root = "/"
+
+[hosts.llmserver-h20]
+backend = "agent"
+env = "merlin"
+url = "http://[2605:340:cd51:7702:2731:9014:50a2:3552]:18765"
 root = "/"

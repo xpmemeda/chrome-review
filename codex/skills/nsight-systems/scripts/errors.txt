@@ -1,0 +1,24 @@
+# Every error message locate_nsys.sh and locate_nsys.bat may print.
+# This file exists to be the single source of truth to keep error output consistent.
+#
+# key=text      a whole line, if the error message has no value
+# key=text      segment 0, if the error message has one or more values
+# key_1=text    segment 1, goes after the first value
+# key_2=text    segment 2, goes after the second value
+#
+# An error message with N values needs N+1 segments: key, key_1, ... key_N.
+# The value goes between each pair of segments.
+#
+# Why fixed segments instead of one template?
+# Because cmd would re-parse a template and mangle special characters in a path. Splitting the text here, once, keeps
+# that parsing out of both scripts. A segment ends where its value starts. Keep the quote there, so every line ends on
+# a visible character.
+# HARD RESTRICTION: The text can't contain "=", since the batch file reads everything up to the first "=" as the key.
+err_arch=ERROR: Could not determine the machine architecture, so no installation could be looked for. Set NSYS_PATH to the directory containing the Nsys CLI executable, or add that directory to PATH.
+err_arch_unsupported=ERROR: Unsupported machine architecture: "
+err_arch_unsupported_1=". Nsight Systems ships targets for x64 and Arm64 only. If the Nsys CLI executable does run on this machine, set NSYS_PATH to the directory containing it, or add that directory to PATH.
+err_root=ERROR: Could not resolve the Nsys CLI executable path on this platform. Make sure Nsight Systems is installed on this machine. If this persists, set NSYS_PATH to the directory containing the Nsys CLI executable, or add that directory to PATH.
+err_nsys_missing=ERROR: No Nsys CLI executable at: "
+err_nsys_missing_1=". NSYS_PATH must name the directory containing the Nsys CLI executable. Point it at that directory, or unset it to detect the Nsys CLI executable from PATH or from the standard install directories.
+err_nsys_not_runnable=ERROR: Nsys CLI executable is not runnable at: "
+err_nsys_not_runnable_1=". Make sure it can run --version successfully on this machine. Fix NSYS_PATH or unset it to detect the Nsys CLI executable from PATH or from the standard install directories.

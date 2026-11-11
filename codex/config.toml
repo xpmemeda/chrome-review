@@ -8,6 +8,13 @@ tool_timeout_sec = 300
 enabled = true
 required = false
 
+[mcp_servers.wechat_confirm]
+url = "http://127.0.0.1:18767/mcp"
+startup_timeout_sec = 10
+tool_timeout_sec = 1900
+enabled = true
+required = false
+
 [mcp_servers.playwright]
 command = "/home/tiger/local/node-24.21.0/bin/node"
 args = ["/home/tiger/local/node-24.21.0/lib/node_modules/@playwright/mcp/cli.js", "--headless", "--executable-path", "/home/tiger/.cache/ms-playwright/chromium-1246/chrome-linux64/chrome"]

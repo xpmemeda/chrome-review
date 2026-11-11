@@ -1,0 +1,16 @@
+{
+  "id": "wechat-confirm-bridge",
+  "name": "WeChat Confirm Bridge",
+  "description": "Route WeChat replies to pending wechat_confirm MCP questions instead of the agent.",
+  "categories": ["other"],
+  "activation": { "onStartup": true },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "endpoint": { "type": "string" },
+      "secretFile": { "type": "string" },
+      "timeoutMs": { "type": "number" }
+    }
+  }
+}

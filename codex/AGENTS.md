@@ -13,19 +13,16 @@
 
 # Agent 运行模式
 
-我有三类机器。
+用户有三类机器。
 
-1. Agent 工作机器，也就是 Codex 或者 Claude 智能体运行的机器。
+1. Agent 工作机器，也就是 Codex / Claude 或者其他智能体运行的机器。
 2. 用户个人的开发机。
 3. 实验机器。
 
 当用户提到机器别名、远程登录、执行远程命令或传输文件等指令时，优先使用 `remote_fleet` MCP，调用 `health` 检查连接。
 用户提供的资料路径，比如文件、代码仓库、图片等，都在用户个人开发机上，需要保存的产物也放到用户的个人开发机。涉及到资料传输的时候，直接在用户个人开发机和实验机器之间传输，不要通过 Agent 工作机器中转。
-
-Codex 会运行在用户的个人开发机上面，即 Agent 工作机器和用户个人开发机是统一台，操作用户个人开发机的时候不需要走远程机器操作。
-Claude 会运行在一个独立的 Agent 工作机器上，因此操作用户个人开发机的时候需要走远程机器操作，个人开发机的名字是 `main-dev`。
-因此你需要根据自己的身份来调整行为。
-
+用户的个人开发机会在 `remote_fleet` 以 `main-dev` 这个名字登记。
+智能体可能会直接运行在用户的个人开发机上面，也即“Agent 工作机器 = 用户个人开发机”，但也有可能不是，你需要检查本机是否上报 `main-dev` 来判断，并根据结果来指导后续的行为。
 
 # 资源地址及修改规范
 
@@ -33,10 +30,10 @@ Claude 会运行在一个独立的 Agent 工作机器上，因此操作用户个
 
 代码仓库放在用户个人开发机的 `~/workspace/github` 或者 `~/workspace/byted` 目录下。
 当用户提到要保存代码时，需要把试验机器上的改动落到用户个人开发机。
-提交 commit 时，按自己的身份在信息里带上对应署名，不要 push：
+提交 commit 时，按自己的身份在信息里带上对应署名，不要 push，签名形式为 `Co-Authored-By: 模型名 <邮箱>`，举两个例子：
 
-- Codex：`Co-authored-by: Codex <noreply@openai.com>`
-- Claude：`Co-Authored-By: Claude <noreply@anthropic.com>`（可带上具体模型名）
+- Codex：`Co-Authored-By: GPT-6 Astra <noreply@openai.com>`
+- Claude：`Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
 
 写代码的时候不用急着写测试和运行测试，先把功能实现，注意模块化的功能划分。
 
@@ -65,6 +62,16 @@ Claude 会运行在一个独立的 Agent 工作机器上，因此操作用户个
 ## 工具
 
 1. 通过 `bvc` 命令下载 SCM 发布的代码库。
+
+## 通过微信向用户确认（`wechat_confirm` MCP）
+
+`wechat_confirm` 通过用户的微信 ClawBot 发消息并读取回复，服务运行在 `main-dev` 的 `127.0.0.1:18767`。何时使用、多久汇报一次，以用户在目标或指令中的要求为准；用户没有要求时不要主动使用。
+
+- 提问用 `ask_user`，带上 `options` 和 `source`（`<Claude 或 Codex> / <任务名>`）；再用 `wait_reply` 等待，返回 `pending` 就继续调用。
+- 进展汇报用 `notify_user`。
+- 返回 `send_failed` 说明微信没有送达，改在终端里说明，不要反复重发。
+- 不要通过微信发送密钥、token、密码等敏感信息。
+- 服务排查：`curl -s 127.0.0.1:18767/healthz`；tmux 会话 `mcp-wechat-confirm`，重启用 `codex/mcps/wechat-confirm/start.sh`，日志在 `~/.local/state/wechat-confirm/server.log`。
 
 
 

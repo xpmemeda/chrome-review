@@ -1,0 +1,4 @@
+interface:
+  display_name: "推理服务 PD 性能测试"
+  short_description: "通过 ModelAPI 或 llmhub 测试 PD 分离服务的 Prefill 和 Decode 性能"
+  default_prompt: "使用 $llm-benchmark 压测指定的 ModelAPI 或 llmhub 服务。"

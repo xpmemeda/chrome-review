@@ -1,15 +1,36 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "model": "anthropic/claude-opus-5-5",
   "mcp": {
     "servers": {
+      "playwright": {
+        "type": "local",
+        "command": [
+          "/home/tiger/local/node-24.21.0/bin/node",
+          "/home/tiger/local/node-24.21.0/lib/node_modules/@playwright/mcp/cli.js",
+          "--headless",
+          "--executable-path",
+          "/home/tiger/.cache/ms-playwright/chromium-1246/chrome-linux64/chrome"
+        ]
+      },
       "remote_fleet": {
         "type": "remote",
         "url": "http://127.0.0.1:18766/mcp",
+        "oauth": false
+      },
+      "wechat_confirm": {
+        "type": "remote",
+        "url": "http://127.0.0.1:18767/mcp",
         "oauth": false
       }
     }
   },
   "providers": {
+    "opencode-go": {
+      "settings": {
+        "apiKey": "{file:~/workspace/github/notes-with-sphinx/.secrets/opencode-go.key}"
+      }
+    },
     "sub2api": {
       "name": "Sub2API",
       "package": "@opencode/ai/providers/openai-compatible",
@@ -23,11 +44,20 @@
           "name": "GPT-6 Astra (relay)",
           "capabilities": {
             "tools": true,
-            "input": ["text"],
-            "output": ["text"],
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ],
             "reasoning": {
               "supported": true,
-              "effort": ["low", "medium", "high", "xhigh"]
+              "effort": [
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
             }
           },
           "limit": {
@@ -42,7 +72,7 @@
       }
     },
     "anthropic": {
-      "name": "Anthropic",
+      "name": "Sub2API Anthropic",
       "package": "@opencode/ai/providers/anthropic-compatible",
       "settings": {
         "baseURL": "http://74.211.111.53:8080/v1",
@@ -51,20 +81,132 @@
       "models": {
         "claude-sonnet-5-5": {
           "name": "Claude Sonnet 5.5",
-          "capabilities": { "tools": true, "input": ["text"], "output": ["text"] }
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
         },
         "claude-opus-5-5": {
           "name": "Claude Opus 5.5",
-          "capabilities": { "tools": true, "input": ["text"], "output": ["text"] }
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
         },
         "claude-haiku-5-5": {
           "name": "Claude Haiku 5.5",
-          "capabilities": { "tools": true, "input": ["text"], "output": ["text"] }
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        }
+      }
+    },
+    "openai": {
+      "name": "Sub2API OpenAI",
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": {
+        "baseURL": "http://74.211.111.53:8080/v1",
+        "apiKey": "{file:~/workspace/github/notes-with-sphinx/.secrets/sub2api-openai.key}"
+      },
+      "models": {
+        "gpt-6-astra": {
+          "modelID": "gpt-6-astra",
+          "name": "GPT-6 Astra (relay)",
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ],
+            "reasoning": {
+              "supported": true,
+              "effort": [
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
+            }
+          },
+          "limit": {
+            "context": 600000,
+            "output": 32000
+          },
+          "cost": {
+            "input": 0,
+            "output": 0
+          }
+        },
+        "gpt-6.1-sol": {
+          "modelID": "gpt-6.1-sol",
+          "name": "GPT-6.1 Sol",
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ],
+            "reasoning": {
+              "supported": true,
+              "effort": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ]
+            }
+          }
+        },
+        "gpt-6.1-terra": {
+          "modelID": "gpt-6.1-terra",
+          "name": "GPT-6.1 Terra",
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ],
+            "reasoning": {
+              "supported": true,
+              "effort": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ]
+            }
+          }
         }
       }
     },
     "antigravity": {
-      "name": "Antigravity",
+      "name": "Sub2API Antigravity",
       "package": "@opencode/ai/providers/anthropic-compatible",
       "settings": {
         "baseURL": "http://74.211.111.53:8080/v1",
@@ -73,19 +215,27 @@
       "models": {
         "gemini-4-argon": {
           "name": "Gemini 4 Argon",
-          "capabilities": { "tools": true, "input": ["text"], "output": ["text"] }
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
         },
-        "gemini-3.8-flash": {
-          "name": "Gemini 3.8 Flash",
-          "capabilities": { "tools": true, "input": ["text"], "output": ["text"] }
-        },
-        "gemini-3.1-pro": {
-          "name": "Gemini 3.1 Pro",
-          "capabilities": { "tools": true, "input": ["text"], "output": ["text"] }
-        },
-        "gemini-pro-agent": {
-          "name": "Gemini Pro Agent",
-          "capabilities": { "tools": true, "input": ["text"], "output": ["text"] }
+        "gemini-4-carbon": {
+          "name": "Gemini 4 Carbon",
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
         }
       }
     }
