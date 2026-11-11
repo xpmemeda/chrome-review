@@ -56,7 +56,7 @@ def scan_log(path):
                 if ids:
                     tid = ids[0]
                     ev = data["events"][tid]
-                    if "base_handler.py:135 call req" in line:
+                    if re.search(r"base_handler\.py:\d+ call req", line):
                         ev["call"] = t
                     if "DriverProxy send tasks" in line:
                         ev["driver"] = t
